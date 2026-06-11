@@ -1,11 +1,11 @@
 ---
 name: clay-workbench
-description: Build, debug, and run Clay.com workbooks end-to-end via Claude Code. Hybrid router skill — auto-detects intent (ABM list build, enrichment waterfall, ICP scoring, outbound generation, inbound routing, troubleshooting) and routes to the right sub-skill. MCP-first execution (mcp__claude_ai_Clay__*) with manual UI walkthrough fallback. Mandatory credit pre-flight, ICP-gates-before-credits enforcement, client-voice detection. Triggers — "build a Clay workbook", "Clay table", "enrich list", "Clay waterfall", "Clay ICP score", "Clay outbound", "Clay inbound enricher", "Clay router", "Clay troubleshoot", "Clay credit burn", "claygent prompt", "Clay subroutine", "/clay".
+description: Build, debug, and run Clay.com workbooks end-to-end via Claude Code. Hybrid router skill — auto-detects intent (ABM list build, enrichment waterfall, ICP scoring, outbound generation, inbound routing, troubleshooting, account research, prospect research, signal monitoring, Claygent prompt iteration, list hygiene, credit forecasting, template library, CRM data hygiene, portfolio cost audit, composite buying signals) and routes to the right sub-skill. MCP-first execution (mcp__claude_ai_Clay__*) with manual UI walkthrough fallback. Mandatory credit pre-flight, ICP-gates-before-credits enforcement, client-voice detection. Triggers — "build a Clay workbook", "Clay table", "enrich list", "Clay waterfall", "Clay ICP score", "Clay outbound", "Clay inbound enricher", "Clay router", "Clay troubleshoot", "Clay credit burn", "claygent prompt", "Clay subroutine", "account research", "prospect research", "signal monitor", "clean this list", "Clay credits", "Clay template", "data hygiene", "cost audit", "buying signals", "/clay".
 ---
 
 # Clay Workbench
 
-The router skill for Clay.com workbook construction inside Claude Code. Delegates to 6 sub-skills based on detected intent.
+The router skill for Clay.com workbook construction inside Claude Code. Delegates to 16 sub-skills based on detected intent.
 
 **Architecture**: Hybrid router + sub-skill pack.
 **Execution**: Clay MCP first, manual UI walkthrough fallback.
@@ -53,11 +53,21 @@ Violation requires explicit `gate-override: <reason>` declaration.
 
 | User Intent | Sub-Skill | Trigger Phrases | What It Builds |
 |-------------|-----------|-----------------|----------------|
+| Pre-clean a source list before any paid run | `clay-list-clean` | "clean this list", "list hygiene", "dedup", "normalize domains", "suppression", "scrub the list", "prep CSV for Clay" | 20-column hygiene table — domain/email/title/geo normalization + dedup + suppression filter + drop_reason report |
+| Ongoing CRM data hygiene (decay / dedup / refresh) | `clay-data-hygiene` | "data hygiene", "CRM dedup", "decay detection", "stale records", "enrichment refresh", "data freshness", "dirty HubSpot", "Salesforce duplicates" | 3 linked tables — `crm_record_health` (rolling freshness) + `crm_duplicates` (weekly dedup) + `refresh_queue` (prioritized re-enrichment) |
 | Build a list of target accounts | `clay-abm-list` | "ABM list", "target accounts", "Tier 1 accounts", "build account list", "expansion list" | Account-keyed workbook with firmographics + triggers + ICP gate |
+| Deep account briefs (multi-source Claygent) | `clay-account-research` | "account research", "account brief", "company deep dive", "one-pager on", "ABM research", "executive prep" | Account-keyed workbook returning priorities + news + hiring + leadership + competitive + entry-point hypothesis per company |
+| Deep person briefs (multi-source Claygent) | `clay-prospect-research` | "prospect research", "person research", "contact dossier", "deep dive on a person", "exec prep", "warm intro mapping" | Person-keyed workbook returning activity + POVs + role scope + mutual connections + personalized entry line per contact |
 | Find contacts + emails + phones | `clay-enrich-waterfall` | "enrich contacts", "find emails", "email waterfall", "contact enrichment", "phone enrichment" | Multi-provider waterfall with graceful exit + verification |
-| Score and rank leads | `clay-icp-score` | "ICP score", "lead score", "fit score", "qualify leads", "10-point grade" | Composite fit+intent score column with routing logic |
+| Score and rank leads (fit score) | `clay-icp-score` | "ICP score", "lead score", "fit score", "qualify leads", "10-point grade" | Composite fit+intent score column with routing logic |
+| Composite multi-source buying-signal score (timing) | `clay-buying-signals` | "buying signals", "intent score", "composite signal", "multi-signal correlation", "in-market accounts", "Bombora", "G2 + 6sense", "intent fusion" | Account-keyed time-decayed composite intent score fusing 8+ signal sources with discrimination backfill test |
 | Generate outbound copy + push to sequencer | `clay-outbound` | "outbound message", "first line", "personalized email", "Sending Gate", "push to SalesLoft / Outreach / 11x" | AI copy columns + Sending Gate + sequencer push action |
 | Route inbound demos / signups | `clay-inbound-routing` | "inbound router", "demo form router", "enrich form fills", "MQL routing", "round-robin" | Webhook source + enrichment + ICP gate + Slack/CRM routing |
+| Recurring trigger / signal monitoring (single source) | `clay-signal-monitor` | "signal monitor", "job change monitor", "hiring trigger", "funding alerts", "Champify", "UserGems", "Predictleads", "ongoing monitor" | Always-on per-source watcher: dedup + ICP gate + signal classifier + severity + play map + Slack/CRM routing |
+| Tune a Claygent prompt for quality + cost | `clay-claygent-iterator` | "iterate Claygent prompt", "tune Claygent", "Claygent quality", "Claygent fabrication", "5/25/100 loop", "refine Claygent" | Structured 5 → 25 → 100 row iteration loop returning a scorecard (PASS %, FABRICATED %, credits/row) and a tuned 5-block prompt |
+| Credit forecast / provider comparison / ROI | `clay-credits` | "Clay credits", "Clay balance", "credit forecast", "provider cost comparison", "Clay ROI", "compare Apollo vs Findymail", "upgrade Clay plan" | Pre-build forecast + multi-mix provider comparison + workbook ROI ranking with reallocation recommendation |
+| Portfolio-wide cost + Global Rules audit | `clay-cost-audit` | "Clay cost audit", "audit all workbooks", "Clay portfolio review", "Global Rules audit", "monthly Clay review", "tier renewal prep" | 12-check audit across every workbook with ranked violations + fix recipes + projected savings |
+| Save / load / version reusable workbook templates | `clay-template-library` | "save this as a template", "load template", "Clay template", "template library", "clone workbook", "version this workbook" | Persistence layer — anonymized template.json + README per template + INDEX.md catalog with SAVE/LOAD/LIST/DIFF/VERSION/SHARE modes |
 | Diagnose a broken or expensive workbook | `clay-troubleshoot` | "Clay is expensive", "match rate is low", "Clay error", "credits burning", "wrong rows enriched" | Root-cause diagnostic + fix recipe + cost-savings estimate |
 
 ### Ambiguity Resolution
@@ -168,11 +178,21 @@ No exceptions. This is enforcement of Global Rule #1.
 
 | Sub-Skill | Slash Command |
 |-----------|---------------|
+| `skills/clay-list-clean/SKILL.md` | `/clay-list-clean` |
+| `skills/clay-data-hygiene/SKILL.md` | `/clay-data-hygiene` |
 | `skills/clay-abm-list/SKILL.md` | `/clay-abm-list` |
+| `skills/clay-account-research/SKILL.md` | `/clay-account-research` |
+| `skills/clay-prospect-research/SKILL.md` | `/clay-prospect-research` |
 | `skills/clay-enrich-waterfall/SKILL.md` | `/clay-enrich-waterfall` |
 | `skills/clay-icp-score/SKILL.md` | `/clay-icp-score` |
+| `skills/clay-buying-signals/SKILL.md` | `/clay-buying-signals` |
 | `skills/clay-outbound/SKILL.md` | `/clay-outbound` |
 | `skills/clay-inbound-routing/SKILL.md` | `/clay-inbound-routing` |
+| `skills/clay-signal-monitor/SKILL.md` | `/clay-signal-monitor` |
+| `skills/clay-claygent-iterator/SKILL.md` | `/clay-claygent-iterator` |
+| `skills/clay-credits/SKILL.md` | `/clay-credits` |
+| `skills/clay-cost-audit/SKILL.md` | `/clay-cost-audit` |
+| `skills/clay-template-library/SKILL.md` | `/clay-template-library` |
 | `skills/clay-troubleshoot/SKILL.md` | `/clay-troubleshoot` |
 
 ---
@@ -181,15 +201,37 @@ No exceptions. This is enforcement of Global Rule #1.
 
 ```
 /clay                     → auto-routes to best sub-skill based on prompt
+
+Hygiene & data quality:
+/clay-list-clean          → pre-Clay list hygiene (always run first on raw lists)
+/clay-data-hygiene        → ongoing CRM dedup + decay detection + refresh queue
+
+Build:
 /clay-abm-list            → build a Tier 1/2/3 ABM account workbook
+/clay-account-research    → multi-source account brief generator
+/clay-prospect-research   → person-level deep research dossier
 /clay-enrich-waterfall    → multi-provider email/phone waterfall
-/clay-icp-score           → composite ICP fit score column
+
+Score:
+/clay-icp-score           → composite ICP fit score (firmographic + persona)
+/clay-buying-signals      → composite multi-source intent score (timing)
+
+Activate:
 /clay-outbound            → personalized copy + Sending Gate + sequencer push
 /clay-inbound-routing     → webhook source + enricher + routing
+/clay-signal-monitor      → recurring single-source trigger watcher → Slack/CRM
+
+Quality & cost:
+/clay-claygent-iterator   → tune Claygent prompts (5/25/100 loop)
+/clay-credits             → credit forecast + provider comparison + ROI
+/clay-cost-audit          → portfolio audit (12 checks across all workbooks)
 /clay-troubleshoot        → diagnose burn rate, low match, or broken column
+
+Persistence:
+/clay-template-library    → save / load / version reusable workbook templates
 ```
 
-When user types `/clay` without context, ask: "What are you building today?" and offer the 6 sub-skill options.
+When user types `/clay` without context, ask: "What are you building today?" and offer the 16 sub-skill options grouped by stage.
 
 ---
 

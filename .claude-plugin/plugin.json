@@ -1,7 +1,7 @@
 {
   "name": "clay-workbench",
-  "version": "1.0.0",
-  "description": "The complete Clay.com workbook plugin for Claude Code. Hybrid router skill with 6 sub-skills covering ABM list building, multi-provider enrichment waterfalls, ICP composite scoring, outbound copy + Sending Gate + sequencer push, real-time inbound enrichment + routing, and diagnostic troubleshooting. MCP-first execution via mcp__claude_ai_Clay__* tools with manual UI walkthrough fallback. Mandatory credit pre-flight, ICP-gates-before-credits enforcement, client-voice detection.",
+  "version": "2.0.0",
+  "description": "The complete Clay.com workbook plugin for Claude Code. Hybrid router skill with 16 sub-skills covering the full Clay workflow — hygiene (pre-Clay list cleaning, ongoing CRM data hygiene), build (ABM lists, account research, prospect research, multi-provider enrichment waterfalls), score (ICP fit + composite buying-signal intent), activate (outbound copy + Sending Gate + sequencer push, real-time inbound routing, recurring trigger monitoring), quality + cost (Claygent prompt iteration, credit forecasting + provider comparison, portfolio-wide cost audit, single-workbook troubleshooting), and persistence (save/load/version reusable workbook templates). MCP-first execution via mcp__claude_ai_Clay__* tools with manual UI walkthrough fallback. Mandatory credit pre-flight, ICP-gates-before-credits enforcement, client-voice detection.",
   "author": {
     "name": "Brandon Redlinger",
     "url": "https://stackandscale.ai"
@@ -9,7 +9,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/brandonredlinger/clay-workbench"
+    "url": "https://github.com/guerrilla2799/clay-workbench"
   },
   "keywords": [
     "clay",
@@ -19,7 +19,17 @@
     "enrichment",
     "waterfall",
     "icp-scoring",
+    "intent-data",
+    "buying-signals",
     "inbound-routing",
+    "signal-monitoring",
+    "account-research",
+    "prospect-research",
+    "claygent",
+    "credit-forecasting",
+    "data-hygiene",
+    "cost-audit",
+    "template-library",
     "sales-engineering",
     "gtm-engineering",
     "revops",
@@ -30,43 +40,120 @@
       "name": "clay-workbench",
       "path": "SKILL.md",
       "description": "Master router — auto-detects intent and routes to the right Clay sub-skill",
-      "command": "/clay"
+      "command": "/clay",
+      "stage": "router"
+    },
+    {
+      "name": "clay-list-clean",
+      "path": "skills/clay-list-clean/SKILL.md",
+      "description": "Pre-Clay list hygiene — domain/email/title/geo normalization + dedup + suppression filter. Always run first on raw lists; cuts burn 30–60%.",
+      "command": "/clay-list-clean",
+      "stage": "hygiene"
+    },
+    {
+      "name": "clay-data-hygiene",
+      "path": "skills/clay-data-hygiene/SKILL.md",
+      "description": "Ongoing CRM-side hygiene — recurring dedup + decay detection + enrichment refresh queue via 3 linked tables (crm_record_health, crm_duplicates, refresh_queue).",
+      "command": "/clay-data-hygiene",
+      "stage": "hygiene"
     },
     {
       "name": "clay-abm-list",
       "path": "skills/clay-abm-list/SKILL.md",
       "description": "Build account-keyed ABM target lists with firmographic + trigger gating",
-      "command": "/clay-abm-list"
+      "command": "/clay-abm-list",
+      "stage": "build"
+    },
+    {
+      "name": "clay-account-research",
+      "path": "skills/clay-account-research/SKILL.md",
+      "description": "Deep multi-source account briefs — priorities + news + hiring + leadership + competitive + entry-point hypothesis per company.",
+      "command": "/clay-account-research",
+      "stage": "build"
+    },
+    {
+      "name": "clay-prospect-research",
+      "path": "skills/clay-prospect-research/SKILL.md",
+      "description": "Deep person-level dossiers — POVs + activity + role scope + warm path + personalized entry line per contact.",
+      "command": "/clay-prospect-research",
+      "stage": "build"
     },
     {
       "name": "clay-enrich-waterfall",
       "path": "skills/clay-enrich-waterfall/SKILL.md",
       "description": "Multi-provider email + phone + LinkedIn waterfall with graceful exit",
-      "command": "/clay-enrich-waterfall"
+      "command": "/clay-enrich-waterfall",
+      "stage": "build"
     },
     {
       "name": "clay-icp-score",
       "path": "skills/clay-icp-score/SKILL.md",
-      "description": "Composite 10-point ICP fit + intent score with routing by band",
-      "command": "/clay-icp-score"
+      "description": "Composite 10-point ICP fit score (firmographic + persona) with routing by band",
+      "command": "/clay-icp-score",
+      "stage": "score"
+    },
+    {
+      "name": "clay-buying-signals",
+      "path": "skills/clay-buying-signals/SKILL.md",
+      "description": "Composite multi-source buying-signal intent score — fuses intent data, web visits, content engagement, hiring, funding, tech adoption, leadership moves into a single time-decayed score with mandatory backfill discrimination test.",
+      "command": "/clay-buying-signals",
+      "stage": "score"
     },
     {
       "name": "clay-outbound",
       "path": "skills/clay-outbound/SKILL.md",
       "description": "Personalized outbound copy + Sending Gate + sequencer push with client-voice detection",
-      "command": "/clay-outbound"
+      "command": "/clay-outbound",
+      "stage": "activate"
     },
     {
       "name": "clay-inbound-routing",
       "path": "skills/clay-inbound-routing/SKILL.md",
       "description": "Real-time webhook enrichment + scoring + routing + Slack alerting",
-      "command": "/clay-inbound-routing"
+      "command": "/clay-inbound-routing",
+      "stage": "activate"
+    },
+    {
+      "name": "clay-signal-monitor",
+      "path": "skills/clay-signal-monitor/SKILL.md",
+      "description": "Recurring single-source trigger monitoring (job changes, hiring, funding, leadership, tech adoption, intent) with severity-classified Slack/CRM routing.",
+      "command": "/clay-signal-monitor",
+      "stage": "activate"
+    },
+    {
+      "name": "clay-claygent-iterator",
+      "path": "skills/clay-claygent-iterator/SKILL.md",
+      "description": "Structured 5 → 25 → 100 row Claygent prompt iteration loop with scorecard (PASS %, FABRICATED %, credits/row). Mandatory before scaling any Claygent column.",
+      "command": "/clay-claygent-iterator",
+      "stage": "quality_cost"
+    },
+    {
+      "name": "clay-credits",
+      "path": "skills/clay-credits/SKILL.md",
+      "description": "Proactive credit forecasting + multi-mix provider cost comparison + workbook ROI ranking with reallocation recommendation.",
+      "command": "/clay-credits",
+      "stage": "quality_cost"
+    },
+    {
+      "name": "clay-cost-audit",
+      "path": "skills/clay-cost-audit/SKILL.md",
+      "description": "Portfolio-wide 12-check audit across every workbook — Global Rules violations + waste + ROI laggards with ranked fixes and projected savings.",
+      "command": "/clay-cost-audit",
+      "stage": "quality_cost"
     },
     {
       "name": "clay-troubleshoot",
       "path": "skills/clay-troubleshoot/SKILL.md",
-      "description": "Diagnose broken, expensive, or under-performing Clay workbooks",
-      "command": "/clay-troubleshoot"
+      "description": "Diagnose broken or expensive workbooks — root cause + fix recipe + cost-savings estimate (single-workbook reactive).",
+      "command": "/clay-troubleshoot",
+      "stage": "quality_cost"
+    },
+    {
+      "name": "clay-template-library",
+      "path": "skills/clay-template-library/SKILL.md",
+      "description": "Persistence layer — save, load, list, diff, version, and share workbook templates with anonymization rules.",
+      "command": "/clay-template-library",
+      "stage": "persistence"
     }
   ],
   "resources": [
