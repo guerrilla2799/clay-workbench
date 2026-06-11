@@ -330,12 +330,15 @@ v2.0.0 (this release):
 - [x] Monitoring layer — shipped as `/clay-signal-monitor` (single source) + `/clay-buying-signals` (multi-source composite)
 - [x] Data hygiene layer — shipped as `/clay-list-clean` (pre-Clay) + `/clay-data-hygiene` (ongoing CRM)
 
+Post-v2.0.0 polish (shipped 2026-06-10):
+- [x] `resources/global-rules.md` cross-refs to all 10 new sub-skills under each rule
+- [x] `templates/library/` seeded with 10 bootstrap templates (`abm-account-keyed-tier-1`, `account-research-tier-1-brief`, `email-waterfall-eu`, `email-waterfall-us-smb`, `inbound-router-demo-form`, `outbound-3-step-cadence-cold`, `outbound-3-step-cadence-warm`, `prospect-research-champion-brief`, `signal-monitor-hiring-posture`, `signal-monitor-job-change`) + stage-grouped INDEX.md catalog
+
 Next:
-- [ ] Schema operations (create new tables via MCP when Clay exposes the API)
-- [ ] Seed `templates/library/` with the 10 bootstrap templates listed in `/clay-template-library`
-- [ ] Subroutine export — round-trip from Clay subroutine ID → portable template.json
-- [ ] Community templates via PR — accept anonymized template contributions
-- [ ] Cross-workbook composition visualizer — graph of which workbooks feed which
+- [ ] **Subroutine export** — round-trip from Clay subroutine ID → portable `template.json`. Adds an EXPORT mode to `/clay-template-library` that reads a live Clay table via MCP, extracts columns + formulas + Claygent prompts + actions, applies anonymization, and writes a template that can be loaded into a different workspace.
+- [ ] **Community templates via PR** — accept anonymized template contributions. Needs `CONTRIBUTING.md`, PR template, and a template validator script that confirms anonymization + schema compliance before merge.
+- [ ] **Cross-workbook composition visualizer** — graph (Mermaid or actual D3 in a static HTML) showing which workbooks feed which. Reads `template.json` `depends_on` chains across the library and renders the data-flow graph.
+- [ ] **Schema operations** — create new tables via MCP when Clay exposes the API. *Blocked on Clay exposing a write API for tables; out of our hands until then.*
 
 ---
 
