@@ -342,6 +342,10 @@ Next:
 
 ---
 
+## Contributing
+
+PRs welcome — especially anonymized templates for `templates/library/`. See [CONTRIBUTING.md](CONTRIBUTING.md) for the template contribution workflow, the anonymization checklist, and the local validator script.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
