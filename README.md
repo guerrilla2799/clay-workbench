@@ -332,14 +332,14 @@ v2.0.0 (this release):
 - [x] Monitoring layer — shipped as `/clay-signal-monitor` (single source) + `/clay-buying-signals` (multi-source composite)
 - [x] Data hygiene layer — shipped as `/clay-list-clean` (pre-Clay) + `/clay-data-hygiene` (ongoing CRM)
 
-Post-v2.0.0 polish (shipped 2026-06-10):
+Post-v2.0.0 polish + roadmap (shipped 2026-06-10):
 - [x] `resources/global-rules.md` cross-refs to all 10 new sub-skills under each rule
 - [x] `templates/library/` seeded with 10 bootstrap templates (`abm-account-keyed-tier-1`, `account-research-tier-1-brief`, `email-waterfall-eu`, `email-waterfall-us-smb`, `inbound-router-demo-form`, `outbound-3-step-cadence-cold`, `outbound-3-step-cadence-warm`, `prospect-research-champion-brief`, `signal-monitor-hiring-posture`, `signal-monitor-job-change`) + stage-grouped INDEX.md catalog
+- [x] **Subroutine export** — EXPORT mode added to `/clay-template-library` for automated round-trip from a live Clay subroutine or table → portable `template.json` with workspace-portability transforms + anonymization applied
+- [x] **Community templates via PR** — `CONTRIBUTING.md` + `.github/PULL_REQUEST_TEMPLATE.md` + `scripts/validate-template.py` (stdlib only; schema + anonymization checks)
+- [x] **Cross-workbook composition visualizer** — `scripts/compose-graph.py` reads `templates/library/*/template.json` and emits Mermaid graphs at `docs/composition/library-graph.md` + `docs/composition/per-template/<slug>.md`; idempotent with `--check` flag for CI drift detection
 
 Next:
-- [ ] **Subroutine export** — round-trip from Clay subroutine ID → portable `template.json`. Adds an EXPORT mode to `/clay-template-library` that reads a live Clay table via MCP, extracts columns + formulas + Claygent prompts + actions, applies anonymization, and writes a template that can be loaded into a different workspace.
-- [ ] **Community templates via PR** — accept anonymized template contributions. Needs `CONTRIBUTING.md`, PR template, and a template validator script that confirms anonymization + schema compliance before merge.
-- [ ] **Cross-workbook composition visualizer** — graph (Mermaid or actual D3 in a static HTML) showing which workbooks feed which. Reads `template.json` `depends_on` chains across the library and renders the data-flow graph.
 - [ ] **Schema operations** — create new tables via MCP when Clay exposes the API. *Blocked on Clay exposing a write API for tables; out of our hands until then.*
 
 ---
