@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/cover.png" alt="Your Clay Workbench — A Claude Code plugin for B2B GTM teams" width="100%" />
+</p>
+
 # clay-workbench
 
 > The complete Clay.com workbook plugin for Claude Code.
