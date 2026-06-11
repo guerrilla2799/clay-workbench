@@ -25,12 +25,13 @@ State the mode at the start of any response.
 
 | Mode | Triggered By | Output |
 |------|-------------|--------|
-| **SAVE** | "save this workbook as a template", "capture this as a template" | template.json + README.md + INDEX.md update |
+| **SAVE** | "save this workbook as a template", "capture this as a template" | template.json + README.md + INDEX.md update (manual or hybrid composition) |
+| **EXPORT** | "export subroutine `<id>`", "round-trip this Clay subroutine to a template", "make this subroutine portable" | template.json + README.md + INDEX.md + portability report (automated MCP round-trip from a live Clay subroutine or table) |
 | **LOAD** | "instantiate template X", "load template X for {client}", "use template X as a starting point" | Step-by-step Clay UI walkthrough OR MCP run with parameterized inputs |
 | **LIST** | "what templates do I have?", "list templates" | Read of INDEX.md with filters (use case, motion, client) |
 | **DIFF** | "what changed between template v1 and v2?", "diff templates" | Column-by-column diff between two versions |
 | **VERSION** | "bump this template", "save v2 of template X" | New version dir + version-pinned INDEX entry |
-| **SHARE** | "export this template", "share template X" | Bundled markdown + JSON ready to paste / commit |
+| **SHARE** | "share template X with a teammate / commit to repo" | Bundled markdown + JSON ready to paste / commit |
 
 ---
 
@@ -245,6 +246,143 @@ Output: changelog-style markdown
 
 ---
 
+## EXPORT Mode
+
+The automated round-trip. Where SAVE assumes manual or hybrid composition, EXPORT reads a **live Clay subroutine or table** via MCP, extracts the complete structure, applies workspace-portability transforms + anonymization, and writes a portable `template.json` that can be loaded into a different Clay workspace.
+
+This is the canonical way to add templates to the library going forward — manual JSON authoring (the bootstrap method) only happens when no live workbook exists yet.
+
+### When to use EXPORT vs SAVE
+
+| Situation | Use |
+|-----------|-----|
+| You have a working Clay subroutine you want to make reusable | **EXPORT** |
+| You have a working Clay table (not yet promoted to subroutine) that you want to template | **EXPORT** |
+| You're designing a template from a markdown spec / golden reference without a live workbook | **SAVE** |
+| You're refactoring an existing template's structure | **VERSION** (not EXPORT) |
+
+### Inputs
+
+- Source: **subroutine_id** (preferred) OR table_id (fallback for un-promoted workbooks)
+- Target template slug (kebab-case, will mkdir at `templates/library/<slug>/`)
+- Anonymization profile (default: standard rules; advanced: custom denylist + allowlist)
+- Include actions? (default: yes, with action targets abstracted to placeholders)
+
+### Execution
+
+```
+1. Identify source:
+   - If subroutine_id provided:
+       mcp__claude_ai_Clay__list_subroutines        # confirm it exists
+       mcp__claude_ai_Clay__get_subroutine_input_options   # get input schema
+   - If table_id provided:
+       mcp__claude_ai_Clay__query-objects           # enumerate columns + actions
+       (mark template as "table-sourced, not subroutine-promoted" in description)
+
+2. For each column extracted, capture:
+   - name, type (text | number | formula | enrichment | claygent | action)
+   - source (provider name)
+   - cost_credits (estimated)
+   - depends_on (back-references to other columns by name)
+   - run_condition (raw clayscript with column refs preserved)
+   - config (provider_key, package, max_sources, model — all as captured)
+   - formula_text (raw clayscript)
+   - claygent_prompt (raw prompt, multi-line preserved)
+   - notes (gotchas observed in the live workbook)
+
+3. For each action extracted, capture:
+   - name, type, run_condition, config (target IDs → placeholders), notes
+
+4. Apply WORKSPACE-PORTABILITY transforms (different from anonymization — these are about cross-workspace re-instantiation, not data leak prevention):
+   - Slack channel IDs (`C0123ABC`) → `{{SLACK_CHANNEL_ID_<purpose>}}`
+   - CRM list/object IDs → `{{CRM_<object>_ID}}`
+   - Suppression / lookup table IDs → `{{<purpose>_TABLE_ID}}`
+   - Webhook URLs → `{{WEBHOOK_URL_<purpose>}}`
+   - Sequencer cadence IDs → `{{<sequencer>_CADENCE_<step>_ID}}`
+   - Sender names / emails in outbound copy → `{{SENDER_NAME}}` / `{{SENDER_EMAIL}}`
+   - Action keys that are Clay-tier-specific → preserve key BUT add `notes` flag: "Requires Clay tier X or own-key for provider Y"
+
+5. Apply standard ANONYMIZATION rules (the same set as SAVE):
+   - Client name → `{{CLIENT_NAME}}`
+   - Industry / size / geo lists → `{{ICP_INDUSTRIES}}`, `{{ICP_GEO}}`, etc.
+   - Title lists → `{{ICP_TITLES}}` / `{{TARGET_SENIORITY}}`
+   - Specific competitors named in Claygent prompts → `{{COMPETITORS}}`
+   - Internal product names / project codenames → `{{OUR_PRODUCT_CATEGORY}}` or similar
+   - SDR pool user IDs → `{{SDR_POOL_LIST}}`
+
+6. Compose template.json with auto-detected metadata:
+   - schema_version: "1.0"
+   - template.created_from_workbook_id: <subroutine_id or table_id>
+   - template.created_at: ISO date of export
+   - template.estimated_cost_per_row: computed sum of column cost_credits weighted by run conditions
+   - template.required_resources: union of all provider_keys + action types
+
+7. Compose README.md with the placeholder map auto-populated from steps 4–5. Each placeholder gets a row in the "Required inputs" table with:
+   - The placeholder name
+   - The original value (REDACTED in the README but shown in the portability report)
+   - A description inferred from the column context
+   - An example value (synthetic — never the original)
+
+8. Write to `templates/library/<slug>/{template.json, README.md}`
+
+9. Append a one-line entry to `templates/library/INDEX.md` under the alphabetical row + the correct stage group.
+
+10. Generate the PORTABILITY REPORT — a transient artifact (not saved to repo) shown to the user listing:
+    - Total columns + actions extracted
+    - Workspace-portability transforms applied (count by category)
+    - Anonymization substitutions applied (count by rule)
+    - Any column keys that look workspace-specific but weren't auto-handled (manual review queue)
+    - Round-trip recommendation: "Load this template into a sandbox workspace and run 5 rows to verify before adding to repo"
+
+11. Confirm with user: "Template exported to `<path>`. Portability report above. Want me to (a) commit to clay-workbench repo, (b) keep local-only, or (c) run a round-trip verification against a sandbox workspace?"
+```
+
+### Workspace-Portability vs Anonymization (Critical Distinction)
+
+These are TWO separate concerns and EXPORT applies both:
+
+| Concern | Why it matters | Example |
+|---------|---------------|---------|
+| **Workspace-portability** | Even within the same client, if the template gets re-instantiated in a different Clay workspace (sandbox, prod, second tenant), the workspace-specific IDs (Slack channel IDs, Cadence IDs, table IDs) won't resolve. | Slack channel `C0789` exists in workspace A, not workspace B. Template must use `{{SLACK_CHANNEL_ID_HOT_INBOUND}}` so the load step prompts for the right value per workspace. |
+| **Anonymization** | If the template gets SHARED (across clients, into the public repo, in a community PR), client data must not leak. | "Obin AI" as a client name in a Claygent prompt → `{{CLIENT_NAME}}`. |
+
+A template can be **portable but not anonymized** (safe to share within the client across workspaces but NOT to share publicly). Default EXPORT applies BOTH so the output is share-safe.
+
+### Round-Trip Verification (Strongly Recommended)
+
+After EXPORT, before adding the template to the public library:
+
+```
+1. Pick a sandbox Clay workspace (different from source)
+2. /clay-template-library load <exported-slug>
+3. Fill all placeholders with synthetic test values
+4. Run the loaded workbook on 5 test rows
+5. Spot-check:
+   - Every column resolves with no NULL on the inputs that should have data
+   - Every formula reference still parses (no orphaned column names from the source workspace)
+   - Every action fires to the placeholder target (use a sandbox Slack channel + sandbox CRM)
+   - Cost-per-row matches the exported estimate within ±20%
+6. If pass: commit the template to the repo
+7. If fail: re-EXPORT with a different anonymization profile OR manually fix the gaps that the auto-transform missed
+```
+
+### Edge Cases
+
+- **Subroutines with multiple input variants**: a Clay subroutine can accept N different input schemas (e.g., one for "company list" mode, one for "contact list" mode). EXPORT captures the FIRST input variant by default; flag others as "additional input variants to template separately" in the portability report. Don't try to merge them into one template.
+- **Columns that depend on workspace-specific lookup tables**: if a column does `LOOKUP(<table_id>, ...)`, the table_id transforms to a placeholder BUT the schema of the lookup table is workspace-specific. Add a note in the README: "Lookup target `{{X_TABLE_ID}}` must have columns: <inferred schema>."
+- **Claygent prompts that reference URLs or specific search domains**: these often contain leaked client context. EXPORT applies a heuristic scan for absolute URLs in prompts and lists them in the portability report for manual review.
+- **Live workbooks with `auto_run = TRUE`**: EXPORT NEVER captures the run state. Template loads always start at `auto_run = FALSE` regardless of source.
+
+### Anti-Patterns
+
+❌ EXPORTing a template that hasn't been verified on at least one production run — captures bugs as features.
+❌ Skipping the portability report — usually contains 1–2 manual-review items per export that the auto-transform couldn't classify.
+❌ Committing an EXPORTed template to the public repo without a round-trip verification — discovers anonymization misses only after they've leaked.
+❌ Using EXPORT to "fix" a template — that's what VERSION mode is for. EXPORT always creates a net-new slug.
+❌ Treating EXPORT as the only way to add templates — for templates without a live source workbook (golden refs, hypothetical patterns), SAVE / manual JSON authoring is correct.
+
+---
+
 ## SHARE Mode
 
 ### For a teammate / client receiving
@@ -288,6 +426,16 @@ For SAVE:
 - [ ] INDEX.md updated
 - [ ] Decision made: keep local OR commit to repo
 
+For EXPORT:
+- [ ] Source subroutine_id or table_id confirmed live (MCP returns metadata)
+- [ ] All extracted columns have their `depends_on` references intact (no orphans)
+- [ ] Workspace-portability transforms applied — every workspace-specific ID is a `{{PLACEHOLDER}}`
+- [ ] Anonymization transforms applied — every client identifier is a `{{PLACEHOLDER}}`
+- [ ] Portability report reviewed — manual-review queue items resolved or accepted
+- [ ] Round-trip verification run on a sandbox workspace OR explicit decision to skip with reason logged
+- [ ] No `auto_run = TRUE` carried over from source
+- [ ] Lookup table schema notes added to README if applicable
+
 For LOAD:
 - [ ] Every `{{PLACEHOLDER}}` resolved before instantiation
 - [ ] `/clay-credits` forecast run on the filled spec
@@ -320,7 +468,7 @@ These should be saved on first use, capturing the 3 existing golden references p
 9. **outbound-3-step-cadence-cold** — first-line + sequencer push for cold outbound
 10. **outbound-3-step-cadence-warm** — for triggered/warm outbound off a signal monitor
 
-Brandon can save these incrementally as he builds them for real clients.
+All 10 shipped 2026-06-10 as anonymized JSON in `templates/library/`. New templates beyond these should use **EXPORT mode** against live Clay subroutines as the canonical authoring path — the bootstrap pattern (manual JSON authoring) was only used because no live workbooks existed for some patterns yet.
 
 ---
 
@@ -340,4 +488,6 @@ Brandon can save these incrementally as he builds them for real clients.
 - For composing a workbook from scratch (then optionally saving as template) → the 11 build sub-skills.
 - For cost forecasting on a loaded template → `/clay-credits` (always run before instantiating at scale).
 - For auditing template-instantiated workbooks for rule violations → `/clay-cost-audit`.
+- For inspecting how templates feed each other → `docs/composition/` (auto-generated graph of cross-template + intra-template dependencies).
+- For contributing a community template via PR → `CONTRIBUTING.md` at the repo root.
 - Templates committed to the public repo live alongside the other plugin resources at https://github.com/guerrilla2799/clay-workbench.
