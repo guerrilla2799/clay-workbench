@@ -1,0 +1,67 @@
+{
+  "schema_version": "1.0",
+  "template": {
+    "slug": "inbound-router-demo-form",
+    "name": "Inbound Demo-Form Enricher + Router",
+    "version": "1.0",
+    "description": "Real-time webhook → enrich → score → route → Slack/SalesLoft/HubSpot. Hot leads to round-robin SDR within 60s of form submit; warm to nurture; cold to self-serve; personal-email to nurture pool.",
+    "use_case": "inbound",
+    "motion": "hybrid",
+    "created_at": "2026-06-10",
+    "created_from_workbook_id": "golden-ref-02",
+    "estimated_cost_per_row": "8 credits per form fill average",
+    "expected_match_rate": "Pass_1 ~85% (excludes personal-email); ICP-Hot ~10-15%",
+    "required_resources": ["Webhook source", "Clay native find-company", "find-and-enrich-contact", "Predictleads", "Claygent (use-ai)", "HubSpot", "SalesLoft", "Slack"]
+  },
+  "intake_defaults": {
+    "source_type": "webhook",
+    "icp_industries": ["{{ICP_INDUSTRIES}}"],
+    "icp_geo": ["{{ICP_GEO}}"],
+    "icp_size_min": "{{ICP_SIZE_MIN}}",
+    "icp_size_max": "{{ICP_SIZE_MAX}}",
+    "trigger_required": false,
+    "auto_run_after_verification": true
+  },
+  "columns": [
+    {"name": "webhook_payload", "type": "json", "source": "webhook", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": "From form submission"},
+    {"name": "submitted_at", "type": "datetime", "source": "webhook_payload", "cost_credits": 0, "depends_on": ["webhook_payload"], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": null},
+    {"name": "email", "type": "text", "source": "webhook_payload", "cost_credits": 0, "depends_on": ["webhook_payload"], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": null},
+    {"name": "email_domain", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["email"], "run_condition": null, "config": {}, "formula_text": "SPLIT(email, \"@\")[1]", "claygent_prompt": null, "notes": null},
+    {"name": "is_personal_email", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["email_domain"], "run_condition": null, "config": {}, "formula_text": "email_domain IN [\"gmail.com\", \"yahoo.com\", \"outlook.com\", \"hotmail.com\", \"aol.com\", \"icloud.com\", \"me.com\", \"live.com\", \"proton.me\", \"protonmail.com\", \"yandex.com\", \"qq.com\"]", "claygent_prompt": null, "notes": "Add region-specific personal domains if global form"},
+    {"name": "first_name", "type": "text", "source": "webhook_payload", "cost_credits": 0, "depends_on": ["webhook_payload"], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": null},
+    {"name": "last_name", "type": "text", "source": "webhook_payload", "cost_credits": 0, "depends_on": ["webhook_payload"], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": null},
+    {"name": "company_input", "type": "text", "source": "webhook_payload", "cost_credits": 0, "depends_on": ["webhook_payload"], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": null},
+    {"name": "persona_role", "type": "text", "source": "webhook_payload", "cost_credits": 0, "depends_on": ["webhook_payload"], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": "Custom field — role they self-selected"},
+    {"name": "use_case", "type": "text", "source": "webhook_payload", "cost_credits": 0, "depends_on": ["webhook_payload"], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": "Custom field — free-text use case"},
+    {"name": "company_domain", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["is_personal_email", "email_domain"], "run_condition": null, "config": {}, "formula_text": "IF(is_personal_email == TRUE, NULL, email_domain)", "claygent_prompt": null, "notes": null},
+    {"name": "pass_1_qualified", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["is_personal_email", "company_domain"], "run_condition": null, "config": {}, "formula_text": "IF(is_personal_email == TRUE, FALSE, IF(company_domain IS NULL, FALSE, TRUE))", "claygent_prompt": null, "notes": "Pre-enrichment gate"},
+    {"name": "company_data", "type": "enrichment", "source": "clay_native", "cost_credits": 1, "depends_on": ["pass_1_qualified", "company_domain"], "run_condition": "pass_1_qualified = TRUE", "config": {"provider_key": "find-company"}, "formula_text": null, "claygent_prompt": null, "notes": "Returns industry, employee_count, hq_country, revenue_range as extracted sub-fields"},
+    {"name": "person_data", "type": "enrichment", "source": "clay_native", "cost_credits": 2, "depends_on": ["pass_1_qualified"], "run_condition": "pass_1_qualified = TRUE", "config": {"provider_key": "find-and-enrich-contact"}, "formula_text": null, "claygent_prompt": null, "notes": "Returns title, seniority"},
+    {"name": "trigger_event", "type": "enrichment", "source": "predictleads", "cost_credits": 2, "depends_on": ["pass_1_qualified", "company_domain"], "run_condition": "pass_1_qualified = TRUE", "config": {"provider_key": "predictleads"}, "formula_text": null, "claygent_prompt": null, "notes": null},
+    {"name": "fit_score", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["company_data"], "run_condition": null, "config": {}, "formula_text": "(IF(industry IN [{{ICP_INDUSTRIES}}], 2, 0)) + (IF(AND(employee_count >= {{ICP_SIZE_MIN}}, employee_count <= {{ICP_SIZE_MAX}}), 1, 0)) + (IF(hq_country IN [{{ICP_GEO}}], 1, 0)) + (IF(revenue_range IN [{{ICP_REVENUE_BANDS}}], 1, 0))", "claygent_prompt": null, "notes": "5-point fit"},
+    {"name": "intent_score", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["person_data", "trigger_event", "use_case", "persona_role"], "run_condition": null, "config": {}, "formula_text": "(IF(seniority IN [{{ICP_SENIORITY}}], 2, 0)) + (IF(trigger_event IS NOT NULL, 1, 0)) + (IF(use_case IN [{{HIGH_INTENT_USE_CASES}}], 1, 0)) + (IF(persona_role IN [{{ICP_PERSONA_ROLES}}], 1, 0))", "claygent_prompt": null, "notes": "5-point intent"},
+    {"name": "icp_score", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["fit_score", "intent_score"], "run_condition": null, "config": {}, "formula_text": "fit_score + intent_score", "claygent_prompt": null, "notes": "10-point composite"},
+    {"name": "suppression_check", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["email", "company_domain"], "run_condition": null, "config": {}, "formula_text": "LOOKUP({{SUPPRESSION_TABLE_ID}}, email) != NULL OR LOOKUP({{SUPPRESSION_TABLE_ID}}, company_domain) != NULL", "claygent_prompt": null, "notes": null},
+    {"name": "icp_band", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["suppression_check", "icp_score"], "run_condition": null, "config": {}, "formula_text": "IF(suppression_check == TRUE, \"SUPPRESSED\", IF(icp_score >= 8, \"Hot\", IF(icp_score >= 5, \"Warm\", \"Cold\")))", "claygent_prompt": null, "notes": null},
+    {"name": "persona_summary", "type": "claygent", "source": "use-ai", "cost_credits": 3, "depends_on": ["icp_band"], "run_condition": "icp_band IN [\"Hot\", \"Warm\"]", "config": {"provider_key": "use-ai", "max_sources": 2, "model": "sonnet"}, "formula_text": null, "claygent_prompt": "ROLE: B2B SDR briefer. Summarize this inbound lead in ONE sentence for a 5-min SDR prep.\n\nCONTEXT:\n- Person: {first_name} {last_name}, {title} at {company_name}\n- Persona role they selected: {persona_role}\n- Use case they typed: \"{use_case}\"\n- Company: {industry}, {employee_count} emp, {revenue_range}\n- Trigger event (if any): {trigger_event}\n\nTASK:\nWrite ONE sentence <= 30 words that gives the SDR:\n1. The likely real reason they're here (interpreting use_case)\n2. What to lead with on the call\n\nFORMAT:\nReturn ONLY the sentence. No prefix, no quotes.\n\nFALLBACK:\nIf use_case is empty or vague, default to: \"Title + industry suggests evaluating for [function] — open call by asking about current stack.\"", "notes": null},
+    {"name": "route_to", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["icp_band", "is_personal_email"], "run_condition": null, "config": {}, "formula_text": "IF(icp_band == \"SUPPRESSED\", \"SUPPRESSED\", IF(is_personal_email == TRUE, \"PERSONAL_EMAIL_NURTURE\", IF(icp_band == \"Hot\", \"SDR_QUEUE\", IF(icp_band == \"Warm\", \"MARKETING_NURTURE\", \"SELF_SERVE\"))))", "claygent_prompt": null, "notes": null},
+    {"name": "assigned_owner", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["route_to", "hq_country"], "run_condition": "route_to = \"SDR_QUEUE\"", "config": {}, "formula_text": "IF(hq_country IN [{{EMEA_COUNTRIES}}], {{EMEA_SDR_POOL}}[MOD(ROW_INDEX, LENGTH({{EMEA_SDR_POOL}}))], IF(hq_country IN [{{NA_COUNTRIES}}], {{NA_SDR_POOL}}[MOD(ROW_INDEX, LENGTH({{NA_SDR_POOL}}))], {{INTL_SDR_POOL}}[0]))", "claygent_prompt": null, "notes": "Territory + round-robin"},
+    {"name": "slack_message", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["route_to", "persona_summary", "assigned_owner"], "run_condition": "route_to = \"SDR_QUEUE\"", "config": {}, "formula_text": "CONCAT(\"🔥 *Hot Inbound — \", company_name, \"*\\nPerson: \", first_name, \" \", last_name, \", \", title, \"\\nEmail: \", email, \" · Use case: \\\"\", use_case, \"\\\"\\nICP score: \", icp_score, \"/10 · Trigger: \", trigger_event, \"\\n\\nSDR brief: \", persona_summary, \"\\n\\nAssigned: <@\", assigned_owner, \">\")", "claygent_prompt": null, "notes": null}
+  ],
+  "actions": [
+    {"name": "hubspot_upsert", "type": "crm_create", "run_condition": "route_to != \"SUPPRESSED\"", "config": {"object_type": "contact", "dedup_key": "email"}, "notes": null},
+    {"name": "salesloft_push", "type": "sequencer_push", "run_condition": "route_to = \"SDR_QUEUE\"", "config": {"cadence_id": "{{SALESLOFT_INBOUND_HOT_CADENCE_ID}}", "owner_field": "assigned_owner"}, "notes": null},
+    {"name": "slack_alert_hot", "type": "slack", "run_condition": "route_to = \"SDR_QUEUE\"", "config": {"channel": "{{SLACK_HOT_INBOUND_CHANNEL}}", "message_column": "slack_message"}, "notes": "SLA: 5-min response"}
+  ],
+  "verification_checklist": [
+    "Webhook fires from form → row appears within 30s",
+    "Personal email submissions route to PERSONAL_EMAIL_NURTURE, not SDR",
+    "Out-of-ICP submissions route to SELF_SERVE, not SDR",
+    "Known customer test → SUPPRESSED, no Slack alert",
+    "Hot lead → Slack within 60s of form submit",
+    "SalesLoft prospect created with correct cadence",
+    "HubSpot contact upserts without duplicate on resubmit",
+    "Round-robin distributes evenly across SDR pool over 20 submissions",
+    "auto_run = FALSE during Phase 1+2; flip to TRUE only after verification"
+  ]
+}

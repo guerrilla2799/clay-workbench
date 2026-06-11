@@ -1,0 +1,54 @@
+{
+  "schema_version": "1.0",
+  "template": {
+    "slug": "signal-monitor-hiring-posture",
+    "name": "Signal Monitor — Hiring Posture Watcher",
+    "version": "1.0",
+    "description": "Recurring weekly hiring-trigger monitor across an ICP account watchlist. Detects when target accounts start hiring for the role categories that buy your product (e.g. RevOps Director, Head of GTM Engineering). Predictleads or Claygent LinkedIn jobs scan; severity-tiered routing.",
+    "use_case": "monitoring",
+    "motion": "hybrid",
+    "created_at": "2026-06-10",
+    "created_from_workbook_id": "skill-spec-clay-signal-monitor-hiring-variant",
+    "estimated_cost_per_row": "3-7 credits per watched account per refresh cycle",
+    "expected_match_rate": "Predictleads ~90% on US accounts; Claygent fallback ~70%",
+    "required_resources": ["Predictleads (recommended)", "Claygent (use-ai) fallback", "Clay subroutine (scheduled weekly)", "Slack", "CRM"]
+  },
+  "intake_defaults": {
+    "source_type": "account_watchlist",
+    "watch_list_segment": "target_accounts_tier_1_2",
+    "refresh_schedule": "weekly",
+    "auto_run": true,
+    "alert_severity_floor": "WARM"
+  },
+  "columns": [
+    {"name": "watch_id", "type": "text", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": null},
+    {"name": "company_domain", "type": "text", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": null},
+    {"name": "company_name", "type": "text", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": null},
+    {"name": "linkedin_company_url", "type": "text", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": null},
+    {"name": "account_tier", "type": "text", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": "T1 / T2 / T3 from upstream account workbook"},
+    {"name": "last_checked_at", "type": "datetime", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": null},
+    {"name": "due_for_check", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["last_checked_at"], "run_condition": null, "config": {}, "formula_text": "DAYS_BETWEEN(NOW(), last_checked_at) >= 7", "claygent_prompt": null, "notes": "Weekly default"},
+    {"name": "hiring_signal", "type": "enrichment", "source": "predictleads", "cost_credits": 3, "depends_on": ["due_for_check", "company_domain"], "run_condition": "due_for_check = TRUE", "config": {"provider_key": "predictleads", "filter_keywords": "{{TARGET_ROLE_KEYWORDS}}"}, "formula_text": null, "claygent_prompt": null, "notes": "Returns: list of open roles matching keyword filter, posted dates"},
+    {"name": "hiring_claygent_fallback", "type": "claygent", "source": "use-ai", "cost_credits": 5, "depends_on": ["hiring_signal", "linkedin_company_url"], "run_condition": "due_for_check = TRUE AND hiring_signal IS NULL", "config": {"provider_key": "use-ai", "max_sources": 2, "model": "sonnet"}, "formula_text": null, "claygent_prompt": "Scan LinkedIn jobs page + /careers for {company_name} ({linkedin_company_url}).\n\nFilter to roles matching: {{TARGET_ROLE_KEYWORDS}}.\n\nReturn JSON: {\"matching_roles\": [{\"title\": \"\", \"posted_date\": \"YYYY-MM-DD\", \"url\": \"\"}], \"total_matches\": int, \"any_posted_in_last_14d\": bool}.", "notes": null},
+    {"name": "hiring_consolidated", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["hiring_signal", "hiring_claygent_fallback"], "run_condition": null, "config": {}, "formula_text": "COALESCE(hiring_signal, hiring_claygent_fallback)", "claygent_prompt": null, "notes": null},
+    {"name": "recency_signal", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["hiring_consolidated"], "run_condition": null, "config": {}, "formula_text": "IF(hiring_consolidated.any_posted_in_last_14d == TRUE, \"FRESH\", IF(hiring_consolidated.total_matches > 0, \"AGING\", \"NONE\"))", "claygent_prompt": null, "notes": null},
+    {"name": "signal_severity", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["recency_signal", "hiring_consolidated", "account_tier"], "run_condition": null, "config": {}, "formula_text": "IF(recency_signal == \"NONE\", \"NONE\", IF(AND(account_tier == \"T1\", recency_signal == \"FRESH\"), \"HOT\", IF(AND(account_tier IN [\"T1\", \"T2\"], recency_signal == \"FRESH\"), \"WARM\", \"COLD\")))", "claygent_prompt": null, "notes": null},
+    {"name": "play_recommended", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["signal_severity", "hiring_consolidated"], "run_condition": null, "config": {}, "formula_text": "IF(signal_severity == \"HOT\", CONCAT(\"SDR_NOW with role context: \", hiring_consolidated.matching_roles[0].title), IF(signal_severity == \"WARM\", \"AE_2WK_FOLLOWUP\", IF(signal_severity == \"COLD\", \"MONITOR\", \"NONE\")))", "claygent_prompt": null, "notes": null},
+    {"name": "alert_message", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["company_name", "hiring_consolidated", "signal_severity", "play_recommended", "account_tier"], "run_condition": "signal_severity IN [\"HOT\", \"WARM\"]", "config": {}, "formula_text": "CONCAT(\"📈 *Hiring signal — \", signal_severity, \"*\\n\", company_name, \" (Tier \", account_tier, \") posted \", hiring_consolidated.total_matches, \" matching role(s)\\nHottest: \", hiring_consolidated.matching_roles[0].title, \" (\", hiring_consolidated.matching_roles[0].posted_date, \")\\nLink: \", hiring_consolidated.matching_roles[0].url, \"\\nPlay: \", play_recommended)", "claygent_prompt": null, "notes": null},
+    {"name": "route_to", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["signal_severity"], "run_condition": null, "config": {}, "formula_text": "IF(signal_severity == \"HOT\", \"SDR_QUEUE\", IF(signal_severity == \"WARM\", \"AE_FOLLOWUP_QUEUE\", \"NONE\"))", "claygent_prompt": null, "notes": null}
+  ],
+  "actions": [
+    {"name": "slack_alert_hot", "type": "slack", "run_condition": "signal_severity = \"HOT\"", "config": {"channel": "{{SLACK_HOT_CHANNEL}}", "message_column": "alert_message"}, "notes": null},
+    {"name": "slack_digest_warm", "type": "slack", "run_condition": "signal_severity IN [\"HOT\", \"WARM\"]", "config": {"channel": "{{SLACK_WEEKLY_DIGEST_CHANNEL}}", "message_column": "alert_message", "batch": "weekly_digest"}, "notes": null},
+    {"name": "crm_note", "type": "crm_update", "run_condition": "signal_severity IN [\"HOT\", \"WARM\"]", "config": {"object_type": "company", "field": "hiring_signal_last_detected", "value": "NOW()"}, "notes": null},
+    {"name": "update_last_checked", "type": "self_update", "run_condition": "due_for_check = TRUE", "config": {"field": "last_checked_at", "value": "NOW()"}, "notes": null}
+  ],
+  "verification_checklist": [
+    "Watch list count matches account workbook T1+T2 count",
+    "First weekly run completes within 60 min for ≤300 accounts",
+    "Known fresh hiring signal in watchlist surfaces as HOT on a T1",
+    "Role keyword filter is tight enough — verify 3/5 surfaced roles actually map to your buyer category",
+    "Slack alert shows actual posted_date (not today's date) — common Claygent parse bug",
+    "Account tier T3 → never HOT (severity formula respects tier gate)"
+  ]
+}

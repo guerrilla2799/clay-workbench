@@ -1,0 +1,46 @@
+{
+  "schema_version": "1.0",
+  "template": {
+    "slug": "email-waterfall-eu",
+    "name": "Email Waterfall — EU",
+    "version": "1.0",
+    "description": "Contact-keyed email waterfall optimized for EU ICPs. Dropcontact → Datagma → Findymail, with ZeroBounce verification. Dropcontact leads because of better GDPR-compliance + higher EU match rate.",
+    "use_case": "enrichment",
+    "motion": "slg",
+    "created_at": "2026-06-10",
+    "created_from_workbook_id": "golden-ref-03-waterfall-eu-variant",
+    "estimated_cost_per_row": "5-7 credits per contact",
+    "expected_match_rate": "70-80% on EU ICPs (vs ~50% if Apollo-led)",
+    "required_resources": ["Dropcontact", "Datagma", "Findymail", "ZeroBounce"]
+  },
+  "intake_defaults": {
+    "source_type": "contact_list",
+    "icp_geo": ["United Kingdom", "Germany", "France", "Netherlands", "Spain", "Italy", "Sweden", "Denmark", "Ireland", "Belgium"],
+    "icp_size_min": 50,
+    "icp_size_max": 5000,
+    "trigger_required": false
+  },
+  "columns": [
+    {"name": "first_name", "type": "text", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": null},
+    {"name": "last_name", "type": "text", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": null},
+    {"name": "company_domain", "type": "text", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": null},
+    {"name": "linkedin_url", "type": "text", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": "Strongly recommended for EU — many providers depend on it"},
+    {"name": "hq_country", "type": "text", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": "Used for GDPR-safe routing"},
+    {"name": "icp_gate_qualified", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": "{{ICP_GATE_FORMULA}}", "claygent_prompt": null, "notes": "Global Rule 1: gate before paid columns"},
+    {"name": "email_dropcontact", "type": "enrichment", "source": "dropcontact", "cost_credits": 2, "depends_on": ["icp_gate_qualified"], "run_condition": "icp_gate_qualified = TRUE", "config": {"provider_key": "dropcontact"}, "formula_text": null, "claygent_prompt": null, "notes": "Strongest EU match rate; GDPR-compliant"},
+    {"name": "email_datagma", "type": "enrichment", "source": "datagma", "cost_credits": 2, "depends_on": ["email_dropcontact"], "run_condition": "icp_gate_qualified = TRUE AND email_dropcontact IS NULL", "config": {"provider_key": "datagma"}, "formula_text": null, "claygent_prompt": null, "notes": "Good EU fallback, esp. for DACH"},
+    {"name": "email_findymail", "type": "enrichment", "source": "findymail", "cost_credits": 2, "depends_on": ["email_datagma"], "run_condition": "icp_gate_qualified = TRUE AND email_datagma IS NULL", "config": {"provider_key": "findymail"}, "formula_text": null, "claygent_prompt": null, "notes": "Last fallback"},
+    {"name": "email", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["email_dropcontact", "email_datagma", "email_findymail"], "run_condition": null, "config": {}, "formula_text": "COALESCE(email_dropcontact, email_datagma, email_findymail)", "claygent_prompt": null, "notes": null},
+    {"name": "email_source", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["email_dropcontact", "email_datagma", "email_findymail"], "run_condition": null, "config": {}, "formula_text": "IF(email_dropcontact IS NOT NULL, \"dropcontact\", IF(email_datagma IS NOT NULL, \"datagma\", IF(email_findymail IS NOT NULL, \"findymail\", NULL)))", "claygent_prompt": null, "notes": null},
+    {"name": "email_verified", "type": "enrichment", "source": "zerobounce", "cost_credits": 1, "depends_on": ["email"], "run_condition": "email IS NOT NULL", "config": {"provider_key": "zerobounce"}, "formula_text": null, "claygent_prompt": null, "notes": "EU providers don't ship verified-by-default — verify all"},
+    {"name": "email_deliverable", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["email_verified"], "run_condition": null, "config": {}, "formula_text": "email_verified IN [\"valid\", \"accept_all_high\"]", "claygent_prompt": null, "notes": null}
+  ],
+  "actions": [],
+  "verification_checklist": [
+    "5-row sample: at least 3 emails returned (EU is harder than US)",
+    "25-row sample: 70%+ match rate",
+    "No false-positive on DACH catch-all domains (validate ZeroBounce 'accept_all' classification)",
+    "GDPR: confirm Dropcontact opt-in source is documented for EU prospects",
+    "No paid columns running on gate=FALSE rows"
+  ]
+}

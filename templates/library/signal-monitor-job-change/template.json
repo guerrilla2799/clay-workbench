@@ -1,0 +1,55 @@
+{
+  "schema_version": "1.0",
+  "template": {
+    "slug": "signal-monitor-job-change",
+    "name": "Signal Monitor — Job Change Watcher",
+    "version": "1.0",
+    "description": "Recurring (daily/weekly) job-change monitor for a watch list of contacts (champions, customers, alumni, ICP personas). Champify or UserGems as primary; Claygent LinkedIn scan as fallback. Severity-tiered routing to Slack + CRM. Wakes up on its own schedule — no manual list refresh.",
+    "use_case": "monitoring",
+    "motion": "hybrid",
+    "created_at": "2026-06-10",
+    "created_from_workbook_id": "skill-spec-clay-signal-monitor",
+    "estimated_cost_per_row": "2-5 credits per watched contact per refresh cycle",
+    "expected_match_rate": "Provider-dependent: Champify ~85% detection within 14 days; Claygent fallback ~60%",
+    "required_resources": ["Champify or UserGems (recommended)", "Claygent (use-ai) fallback", "Clay subroutine (scheduled)", "Slack", "HubSpot or Salesforce"]
+  },
+  "intake_defaults": {
+    "source_type": "watch_list",
+    "watch_list_segment": "champions_and_alumni",
+    "refresh_schedule": "daily",
+    "auto_run": true,
+    "alert_severity_floor": "Warm"
+  },
+  "columns": [
+    {"name": "watch_id", "type": "text", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": "Stable ID per watched contact"},
+    {"name": "person_linkedin_url", "type": "text", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": "Primary watch key"},
+    {"name": "current_known_company", "type": "text", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": "Used to detect change"},
+    {"name": "current_known_title", "type": "text", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": null},
+    {"name": "watch_segment", "type": "text", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": "champion / customer / alumni / icp_persona / advocate"},
+    {"name": "last_checked_at", "type": "datetime", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": "Skip rows checked in last N days"},
+    {"name": "due_for_check", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["last_checked_at"], "run_condition": null, "config": {}, "formula_text": "DAYS_BETWEEN(NOW(), last_checked_at) >= {{REFRESH_INTERVAL_DAYS}}", "claygent_prompt": null, "notes": null},
+    {"name": "job_change_detected", "type": "enrichment", "source": "champify_or_usergems", "cost_credits": 3, "depends_on": ["due_for_check", "person_linkedin_url"], "run_condition": "due_for_check = TRUE", "config": {"provider_key": "{{JOB_CHANGE_PROVIDER}}"}, "formula_text": null, "claygent_prompt": null, "notes": "Returns: {changed: bool, new_company: str, new_title: str, change_date: date, days_since_change: int}"},
+    {"name": "job_change_claygent_fallback", "type": "claygent", "source": "use-ai", "cost_credits": 5, "depends_on": ["job_change_detected", "person_linkedin_url"], "run_condition": "due_for_check = TRUE AND job_change_detected IS NULL", "config": {"provider_key": "use-ai", "max_sources": 1, "model": "sonnet"}, "formula_text": null, "claygent_prompt": "Check {person_linkedin_url} for current company + title. Compare to known: company={current_known_company}, title={current_known_title}.\n\nReturn JSON: {\"changed\": bool, \"new_company\": \"\"|null, \"new_title\": \"\"|null, \"change_date\": \"YYYY-MM\"|null}.", "notes": "Only fires if primary provider returned null"},
+    {"name": "change_consolidated", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["job_change_detected", "job_change_claygent_fallback"], "run_condition": null, "config": {}, "formula_text": "COALESCE(job_change_detected, job_change_claygent_fallback)", "claygent_prompt": null, "notes": null},
+    {"name": "icp_fit_of_new_company", "type": "claygent", "source": "use-ai", "cost_credits": 4, "depends_on": ["change_consolidated"], "run_condition": "change_consolidated.changed = TRUE", "config": {"provider_key": "use-ai", "max_sources": 1, "model": "sonnet"}, "formula_text": null, "claygent_prompt": "Is {change_consolidated.new_company} in our ICP? ICP criteria: {{ICP_CRITERIA_TEXT}}.\n\nReturn JSON: {\"icp_fit\": \"yes|no|partial\", \"reason\": \"string (1 sentence)\"}.", "notes": null},
+    {"name": "signal_severity", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["change_consolidated", "icp_fit_of_new_company", "watch_segment"], "run_condition": null, "config": {}, "formula_text": "IF(change_consolidated.changed == FALSE, \"NONE\", IF(AND(watch_segment IN [\"champion\", \"advocate\"], icp_fit_of_new_company.icp_fit == \"yes\", change_consolidated.days_since_change <= 90), \"HOT\", IF(AND(icp_fit_of_new_company.icp_fit IN [\"yes\", \"partial\"], change_consolidated.days_since_change <= 180), \"WARM\", \"COLD\")))", "claygent_prompt": null, "notes": "HOT = champion at new ICP-fit co within 90 days"},
+    {"name": "play_recommended", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["signal_severity", "watch_segment"], "run_condition": null, "config": {}, "formula_text": "IF(signal_severity == \"HOT\", \"SDR_NOW_WITH_EXEC_NOTE\", IF(signal_severity == \"WARM\", \"AE_2WK_FOLLOWUP\", IF(signal_severity == \"COLD\", \"NURTURE\", \"NONE\")))", "claygent_prompt": null, "notes": null},
+    {"name": "alert_message", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["change_consolidated", "signal_severity", "play_recommended", "watch_segment"], "run_condition": "signal_severity IN [\"HOT\", \"WARM\"]", "config": {}, "formula_text": "CONCAT(\"🚨 *Job change — \", signal_severity, \"*\\n\", full_name, \" moved from \", current_known_company, \" → \", change_consolidated.new_company, \"\\nNew title: \", change_consolidated.new_title, \"\\nWatch segment: \", watch_segment, \"\\nICP fit: \", icp_fit_of_new_company.icp_fit, \"\\nRecommended play: \", play_recommended)", "claygent_prompt": null, "notes": null},
+    {"name": "route_to", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["signal_severity", "play_recommended"], "run_condition": null, "config": {}, "formula_text": "IF(signal_severity == \"HOT\", \"SDR_QUEUE_HOT\", IF(signal_severity == \"WARM\", \"AE_NURTURE_QUEUE\", \"SUPPRESS\"))", "claygent_prompt": null, "notes": null}
+  ],
+  "actions": [
+    {"name": "slack_alert", "type": "slack", "run_condition": "signal_severity = \"HOT\"", "config": {"channel": "{{SLACK_HOT_CHANNEL}}", "message_column": "alert_message"}, "notes": null},
+    {"name": "slack_digest", "type": "slack", "run_condition": "signal_severity IN [\"HOT\", \"WARM\"]", "config": {"channel": "{{SLACK_WARM_DIGEST_CHANNEL}}", "message_column": "alert_message", "batch": "daily_digest"}, "notes": null},
+    {"name": "crm_update", "type": "crm_update", "run_condition": "change_consolidated.changed = TRUE", "config": {"object_type": "contact", "field_mapping": {"current_company": "change_consolidated.new_company", "current_title": "change_consolidated.new_title", "last_job_change_date": "change_consolidated.change_date"}}, "notes": null},
+    {"name": "update_last_checked", "type": "self_update", "run_condition": "due_for_check = TRUE", "config": {"field": "last_checked_at", "value": "NOW()"}, "notes": null}
+  ],
+  "verification_checklist": [
+    "Watch list count matches CRM segment count",
+    "First scheduled run completes within 30 min for ≤500 watched contacts",
+    "Spot-check: known recent job change in watch list surfaces correctly",
+    "HOT severity classification matches manual judgment on 5+ cases",
+    "Slack alert formats correctly (test with a synthetic HOT row first)",
+    "CRM update writes back to correct field (test on 1 record before going live)",
+    "due_for_check skips contacts checked in last {{REFRESH_INTERVAL_DAYS}} days"
+  ]
+}

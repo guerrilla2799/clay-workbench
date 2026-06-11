@@ -1,0 +1,61 @@
+{
+  "schema_version": "1.0",
+  "template": {
+    "slug": "outbound-3-step-cadence-warm",
+    "name": "Outbound — 3-Step Warm/Triggered Cadence",
+    "version": "1.0",
+    "description": "Signal-driven warm outbound variant of outbound-3-step-cadence-cold. Attaches to a signal-monitor (job-change, hiring, funding) and inherits the signal context into the first line. Tighter Sending Gate (signal severity = HOT or WARM required); explicit signal_context block fed into Claygent for first-line generation.",
+    "use_case": "outbound",
+    "motion": "hybrid",
+    "created_at": "2026-06-10",
+    "created_from_workbook_id": "skill-spec-derived",
+    "estimated_cost_per_row": "10-14 credits per signal-triggered contact at Claygent layer",
+    "expected_match_rate": "Sending Gate pass rate: 70-85% (warm signals are pre-qualified upstream); Read-Out-Loud pass on first lines: target 19/20",
+    "required_resources": ["Upstream signal monitor (job-change / hiring / funding)", "Email enrichment for the new contact context", "Suppression table", "Claygent (use-ai)", "Sequencer of choice"]
+  },
+  "intake_defaults": {
+    "source_type": "signal_monitor_output",
+    "cadence_steps": 3,
+    "step_1_channel": "email",
+    "step_2_channel": "linkedin_message",
+    "step_3_channel": "email",
+    "auto_run": false,
+    "minimum_severity": "WARM"
+  },
+  "columns": [
+    {"name": "signal_id", "type": "text", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": "From upstream signal monitor"},
+    {"name": "signal_type", "type": "text", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": "job_change / hiring / funding / leadership / product_launch / tech_adoption"},
+    {"name": "signal_severity", "type": "text", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": "HOT / WARM (Cold/None already filtered upstream)"},
+    {"name": "signal_payload", "type": "json", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": "Original signal data — fed into Claygent first-line prompt"},
+    {"name": "signal_date", "type": "date", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": null},
+    {"name": "signal_recency_days", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["signal_date"], "run_condition": null, "config": {}, "formula_text": "DAYS_BETWEEN(NOW(), signal_date)", "claygent_prompt": null, "notes": null},
+    {"name": "first_name", "type": "text", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": null},
+    {"name": "title", "type": "text", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": null},
+    {"name": "company_name", "type": "text", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": null},
+    {"name": "email", "type": "text", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": null},
+    {"name": "email_verified_status", "type": "text", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": null},
+    {"name": "linkedin_url", "type": "text", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": null},
+    {"name": "seniority", "type": "text", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": null},
+    {"name": "suppression_check", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["email"], "run_condition": null, "config": {}, "formula_text": "LOOKUP({{SUPPRESSION_TABLE_ID}}, email) != NULL OR EXISTS(prior_contact_in_last_30_days)", "claygent_prompt": null, "notes": null},
+    {"name": "sending_gate_eligible", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["email", "email_verified_status", "suppression_check", "signal_severity", "signal_recency_days"], "run_condition": null, "config": {}, "formula_text": "AND(email IS NOT NULL, email_verified_status IN [\"valid\", \"accept_all_high\"], suppression_check == FALSE, signal_severity IN [\"HOT\", \"WARM\"], signal_recency_days <= {{MAX_SIGNAL_AGE_DAYS}})", "claygent_prompt": null, "notes": "Strict — must have signal recency"},
+    {"name": "signal_context_summary", "type": "claygent", "source": "use-ai", "cost_credits": 3, "depends_on": ["sending_gate_eligible", "signal_payload", "signal_type"], "run_condition": "sending_gate_eligible = TRUE", "config": {"provider_key": "use-ai", "max_sources": 1, "model": "sonnet"}, "formula_text": null, "claygent_prompt": "Summarize this signal for a sales-rep brief.\n\nSignal type: {signal_type}\nPayload: {signal_payload}\nDays since: {signal_recency_days}\n\nReturn JSON: {\"summary\": \"string (one sentence, 15-25 words)\", \"angle\": \"string (the natural conversation hook)\", \"timing_proof\": \"string (the specific date/event reference)\"}", "notes": null},
+    {"name": "first_line", "type": "claygent", "source": "use-ai", "cost_credits": 4, "depends_on": ["sending_gate_eligible", "signal_context_summary"], "run_condition": "sending_gate_eligible = TRUE", "config": {"provider_key": "use-ai", "max_sources": 0, "model": "sonnet"}, "formula_text": null, "claygent_prompt": "ROLE: Peer-to-peer B2B sales rep writing the OPENING line of a triggered outbound email.\n\nCONTEXT:\n- Recipient: {first_name}, {title} at {company_name}\n- Signal: {signal_context_summary.summary}\n- Angle: {signal_context_summary.angle}\n- Timing proof: {signal_context_summary.timing_proof}\n\nVOICE: {{VOICE_DESCRIPTOR}}\n\nTASK:\nWrite ONE sentence (15-25 words) that:\n- Leads with the signal observation directly — congratulations / saw your move / etc. (warm-tone OK because signal is recent)\n- Names the timing proof specifically\n- Sets up the relevance of YOUR product to THEIR new situation\n\nBanned words: unlock, leverage, supercharge, hope\nBanned starts: \"I saw\", \"I noticed\", \"Hope\"\n\nFORMAT:\nReturn the sentence ONLY.\n\nFALLBACK:\nReturn: \"[signal context unclear]\" — will skip step 1.", "notes": "Warm tone is OK here, unlike cold cadence. Tone calibration is different."},
+    {"name": "subject_line", "type": "claygent", "source": "use-ai", "cost_credits": 2, "depends_on": ["sending_gate_eligible", "signal_context_summary"], "run_condition": "sending_gate_eligible = TRUE", "config": {"provider_key": "use-ai", "max_sources": 0, "model": "sonnet"}, "formula_text": null, "claygent_prompt": "ROLE: B2B subject line writer. 3-6 words.\n\nCONTEXT:\n- Recipient: {first_name}\n- Signal angle: {signal_context_summary.angle}\n\nTASK:\nWrite a 3-6 word subject. Reference the signal lightly. One of these patterns:\n- \"Congrats on {signal_event_short}\"\n- \"{signal_event_short} → {first_name}\"\n- \"{first_name} - {one-word context}\"\n\nFORMAT: Subject line only.", "notes": null},
+    {"name": "step_1_eligible", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["sending_gate_eligible", "first_line"], "run_condition": null, "config": {}, "formula_text": "AND(sending_gate_eligible == TRUE, LENGTH(first_line) >= 30, NOT(first_line CONTAINS \"[signal context unclear]\"))", "claygent_prompt": null, "notes": null},
+    {"name": "step_2_eligible", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["step_1_eligible", "linkedin_url"], "run_condition": null, "config": {}, "formula_text": "AND(step_1_eligible == TRUE, step_1_sent_at IS NOT NULL, step_1_replied != TRUE, step_1_bounced != TRUE, DAYS_SINCE(step_1_sent_at) >= 2, DAYS_SINCE(step_1_sent_at) <= 7, linkedin_url IS NOT NULL)", "claygent_prompt": null, "notes": "Tighter window than cold (2-7 days vs 3-10) because signal freshness decays fast"},
+    {"name": "step_3_eligible", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["step_2_eligible"], "run_condition": null, "config": {}, "formula_text": "AND(step_2_eligible == TRUE OR step_1_eligible == TRUE, step_1_replied != TRUE, step_1_bounced != TRUE, DAYS_SINCE(step_1_sent_at) >= 7, DAYS_SINCE(step_1_sent_at) <= 14)", "claygent_prompt": null, "notes": null}
+  ],
+  "actions": [
+    {"name": "sequencer_push_step_1", "type": "sequencer_push", "run_condition": "step_1_eligible = TRUE AND signal_severity = \"HOT\"", "config": {"sequencer": "{{SEQUENCER_PLATFORM}}", "cadence_id": "{{CADENCE_ID_HOT_STEP_1}}", "field_mapping": {"email": "email", "first_name": "first_name", "company_name": "company_name", "custom_first_line": "first_line", "custom_subject": "subject_line"}}, "notes": null},
+    {"name": "sequencer_push_step_1_warm", "type": "sequencer_push", "run_condition": "step_1_eligible = TRUE AND signal_severity = \"WARM\"", "config": {"sequencer": "{{SEQUENCER_PLATFORM}}", "cadence_id": "{{CADENCE_ID_WARM_STEP_1}}", "field_mapping": {"email": "email", "first_name": "first_name", "company_name": "company_name", "custom_first_line": "first_line", "custom_subject": "subject_line"}}, "notes": "Different cadence for WARM — softer follow-up cadence"},
+    {"name": "crm_upsert", "type": "crm_update", "run_condition": "sending_gate_eligible = TRUE", "config": {"object_type": "contact", "field_mapping": {"last_signal_type": "signal_type", "last_signal_date": "signal_date", "last_signal_severity": "signal_severity"}}, "notes": null}
+  ],
+  "verification_checklist": [
+    "5-row sample: signal context summarizes correctly (no JSON-as-text bugs)",
+    "First lines reference the signal explicitly (not generic)",
+    "Read-Out-Loud test: 19/20 first lines pass (warm cadences hold higher bar)",
+    "HOT vs WARM cadence routing works — different cadence IDs receive correct severity",
+    "Step 2 window (2-7 days) is tighter than cold cadence — verify in sequencer",
+    "Signal recency gate: a 60-day-old signal correctly classifies as NOT eligible (assuming MAX_SIGNAL_AGE_DAYS = 30)"
+  ]
+}

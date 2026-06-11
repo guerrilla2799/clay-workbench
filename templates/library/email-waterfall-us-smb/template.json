@@ -1,0 +1,45 @@
+{
+  "schema_version": "1.0",
+  "template": {
+    "slug": "email-waterfall-us-smb",
+    "name": "Email Waterfall — US SMB",
+    "version": "1.0",
+    "description": "Contact-keyed email waterfall optimized for US SMB ICPs. Apollo → Findymail → Dropcontact, with ZeroBounce verification on uncertain matches. Designed to attach to an account-keyed source like abm-account-keyed-tier-1.",
+    "use_case": "enrichment",
+    "motion": "slg",
+    "created_at": "2026-06-10",
+    "created_from_workbook_id": "golden-ref-03-waterfall-subset",
+    "estimated_cost_per_row": "4-6 credits per contact",
+    "expected_match_rate": "80-90% on US SMB ICPs",
+    "required_resources": ["Apollo (Clay-managed or own-key)", "Findymail", "Dropcontact", "ZeroBounce"]
+  },
+  "intake_defaults": {
+    "source_type": "contact_list",
+    "icp_geo": ["United States"],
+    "icp_size_min": 10,
+    "icp_size_max": 500,
+    "trigger_required": false
+  },
+  "columns": [
+    {"name": "first_name", "type": "text", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": null},
+    {"name": "last_name", "type": "text", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": null},
+    {"name": "company_domain", "type": "text", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": null},
+    {"name": "linkedin_url", "type": "text", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": "Optional — increases match rate"},
+    {"name": "icp_gate_qualified", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": "{{ICP_GATE_FORMULA}}", "claygent_prompt": null, "notes": "Required — Global Rule 1: gate before paid columns. Replace with actual ICP formula from upstream workbook."},
+    {"name": "email_apollo", "type": "enrichment", "source": "apollo", "cost_credits": 1, "depends_on": ["icp_gate_qualified"], "run_condition": "icp_gate_qualified = TRUE", "config": {"provider_key": "apollo", "package": "clay_managed_or_own_key"}, "formula_text": null, "claygent_prompt": null, "notes": "Free at small volumes if Apollo own-key"},
+    {"name": "email_findymail", "type": "enrichment", "source": "findymail", "cost_credits": 2, "depends_on": ["email_apollo"], "run_condition": "icp_gate_qualified = TRUE AND email_apollo IS NULL", "config": {"provider_key": "findymail"}, "formula_text": null, "claygent_prompt": null, "notes": "Strong fallback for US"},
+    {"name": "email_dropcontact", "type": "enrichment", "source": "dropcontact", "cost_credits": 2, "depends_on": ["email_findymail"], "run_condition": "icp_gate_qualified = TRUE AND email_findymail IS NULL", "config": {"provider_key": "dropcontact"}, "formula_text": null, "claygent_prompt": null, "notes": "Last fallback — adds 5-10% match rate"},
+    {"name": "email", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["email_apollo", "email_findymail", "email_dropcontact"], "run_condition": null, "config": {}, "formula_text": "COALESCE(email_apollo, email_findymail, email_dropcontact)", "claygent_prompt": null, "notes": null},
+    {"name": "email_source", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["email_apollo", "email_findymail", "email_dropcontact"], "run_condition": null, "config": {}, "formula_text": "IF(email_apollo IS NOT NULL, \"apollo\", IF(email_findymail IS NOT NULL, \"findymail\", IF(email_dropcontact IS NOT NULL, \"dropcontact\", NULL)))", "claygent_prompt": null, "notes": "Used for verification skip + diagnostic"},
+    {"name": "email_verified", "type": "enrichment", "source": "zerobounce", "cost_credits": 1, "depends_on": ["email", "email_source"], "run_condition": "email IS NOT NULL AND email_source != \"apollo_verified\"", "config": {"provider_key": "zerobounce"}, "formula_text": null, "claygent_prompt": null, "notes": "Skip verification on Apollo-verified emails — wasted credit"},
+    {"name": "email_deliverable", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["email_verified"], "run_condition": null, "config": {}, "formula_text": "email_verified IN [\"valid\", \"accept_all_high\"]", "claygent_prompt": null, "notes": "Final deliverability gate"}
+  ],
+  "actions": [],
+  "verification_checklist": [
+    "5-row sample: at least 4 emails returned",
+    "25-row sample: 80%+ match rate",
+    "Apollo-verified emails skip ZeroBounce (check email_source column)",
+    "No paid columns running on gate=FALSE rows",
+    "Total credit/row stays under 5 on average"
+  ]
+}

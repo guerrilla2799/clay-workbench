@@ -1,0 +1,60 @@
+{
+  "schema_version": "1.0",
+  "template": {
+    "slug": "abm-account-keyed-tier-1",
+    "name": "ABM Tier 1 — Account-Keyed with Triggers",
+    "version": "1.0",
+    "description": "Account-keyed ABM workbook with two-pass ICP gate, trigger-event qualification, tier scoring, and routing to SDR queue / nurture / programmatic.",
+    "use_case": "abm-list",
+    "motion": "slg",
+    "created_at": "2026-06-10",
+    "created_from_workbook_id": "golden-ref-01",
+    "estimated_cost_per_row": "14 credits per qualified account (most disqualify at pass_1)",
+    "expected_match_rate": "25% pass_1 qualified, 5-10% T1",
+    "required_resources": ["Apollo (source)", "Clay native enrichment", "People Data Labs", "Predictleads", "Wappalyzer (lite)", "Claygent (use-ai)", "HubSpot", "Slack"]
+  },
+  "intake_defaults": {
+    "source_type": "apollo_search_url",
+    "icp_industries": ["{{ICP_INDUSTRIES}}"],
+    "icp_geo": ["{{ICP_GEO}}"],
+    "icp_size_min": "{{ICP_SIZE_MIN}}",
+    "icp_size_max": "{{ICP_SIZE_MAX}}",
+    "trigger_required": true,
+    "trigger_recency_max_days": 90
+  },
+  "columns": [
+    {"name": "company_domain", "type": "text", "source": "apollo_source", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": "Primary key"},
+    {"name": "company_name", "type": "text", "source": "apollo_source", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": null},
+    {"name": "industry", "type": "enrichment", "source": "clay_native", "cost_credits": 1, "depends_on": ["company_domain"], "run_condition": null, "config": {"provider_key": "find-company"}, "formula_text": null, "claygent_prompt": null, "notes": null},
+    {"name": "employee_count", "type": "enrichment", "source": "clay_native", "cost_credits": 1, "depends_on": ["company_domain"], "run_condition": null, "config": {"provider_key": "find-company"}, "formula_text": null, "claygent_prompt": null, "notes": null},
+    {"name": "hq_country", "type": "enrichment", "source": "clay_native", "cost_credits": 1, "depends_on": ["company_domain"], "run_condition": null, "config": {"provider_key": "find-company"}, "formula_text": null, "claygent_prompt": null, "notes": null},
+    {"name": "pass_1_qualified", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["industry", "employee_count", "hq_country"], "run_condition": null, "config": {}, "formula_text": "IF(AND(industry IN [{{ICP_INDUSTRIES}}], employee_count >= {{ICP_SIZE_MIN}}, employee_count <= {{ICP_SIZE_MAX}}, hq_country IN [{{ICP_GEO}}]), TRUE, FALSE)", "claygent_prompt": null, "notes": "Cheap gate before any paid enrichment fires"},
+    {"name": "revenue_range", "type": "enrichment", "source": "people_data_labs", "cost_credits": 2, "depends_on": ["pass_1_qualified"], "run_condition": "pass_1_qualified = TRUE", "config": {"provider_key": "people-data-labs"}, "formula_text": null, "claygent_prompt": null, "notes": null},
+    {"name": "funding_stage", "type": "enrichment", "source": "predictleads", "cost_credits": 2, "depends_on": ["pass_1_qualified"], "run_condition": "pass_1_qualified = TRUE", "config": {"provider_key": "predictleads"}, "formula_text": null, "claygent_prompt": null, "notes": null},
+    {"name": "funding_last_round_date", "type": "enrichment", "source": "predictleads", "cost_credits": 0, "depends_on": ["funding_stage"], "run_condition": "pass_1_qualified = TRUE", "config": {"provider_key": "predictleads"}, "formula_text": null, "claygent_prompt": null, "notes": "Included with funding_stage call"},
+    {"name": "tech_stack_signals", "type": "enrichment", "source": "wappalyzer_lite", "cost_credits": 1, "depends_on": ["pass_1_qualified"], "run_condition": "pass_1_qualified = TRUE", "config": {"provider_key": "wappalyzer"}, "formula_text": null, "claygent_prompt": null, "notes": "Drop if not used in gate — saves 1 cr/row"},
+    {"name": "trigger_event", "type": "enrichment", "source": "predictleads", "cost_credits": 2, "depends_on": ["pass_1_qualified"], "run_condition": "pass_1_qualified = TRUE", "config": {"provider_key": "predictleads"}, "formula_text": null, "claygent_prompt": null, "notes": null},
+    {"name": "trigger_recency_days", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["trigger_event"], "run_condition": null, "config": {}, "formula_text": "IF(trigger_event != NULL, DAYS_BETWEEN(NOW(), trigger_event_date), NULL)", "claygent_prompt": null, "notes": null},
+    {"name": "icp_gate_qualified", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["pass_1_qualified", "revenue_range", "trigger_event", "trigger_recency_days"], "run_condition": null, "config": {}, "formula_text": "IF(AND(pass_1_qualified == TRUE, revenue_range IN [{{ICP_REVENUE_BANDS}}], trigger_event IS NOT NULL, trigger_recency_days <= 90), TRUE, FALSE)", "claygent_prompt": null, "notes": "Full ICP gate after enrichment"},
+    {"name": "account_tier", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["icp_gate_qualified", "employee_count", "trigger_event"], "run_condition": null, "config": {}, "formula_text": "IF(icp_gate_qualified == FALSE, \"DISQUALIFIED\", IF(AND(employee_count >= 1000, trigger_event IN [\"funding\", \"exec_change\"]), \"T1\", IF(OR(employee_count >= 500, trigger_event != NULL), \"T2\", \"T3\")))", "claygent_prompt": null, "notes": null},
+    {"name": "pain_research", "type": "claygent", "source": "use-ai", "cost_credits": 5, "depends_on": ["icp_gate_qualified"], "run_condition": "icp_gate_qualified = TRUE", "config": {"provider_key": "use-ai", "max_sources": 3, "model": "sonnet"}, "formula_text": null, "claygent_prompt": "ROLE: B2B SaaS sales analyst doing pre-call account research.\n\nCONTEXT:\n- Company: {company_name}\n- Industry: {industry}, {employee_count} employees, {hq_country}\n- Funding: {funding_stage}, last round {funding_last_round_date}\n- Trigger: {trigger_event}\n- Tech: {tech_stack_signals}\n\nSOURCES TO CHECK (max 3):\n1. Their website /about, /careers, /pricing\n2. Their LinkedIn company page\n3. Recent press release or blog about {trigger_event}\n\nTASK:\nIdentify ONE specific operational pain or strategic initiative that:\n- Is publicly stated or strongly implied\n- Connects to the trigger event\n- Maps to a category our product helps with: [{{PAIN_CATEGORIES}}]\n\nReturn EXACTLY this JSON:\n{\n  \"pain\": \"string (15-25 words)\",\n  \"evidence_url\": \"string\",\n  \"category\": \"{{PAIN_CATEGORIES_PIPE_SEP}}\",\n  \"confidence\": \"high|medium|low\"\n}\n\nFALLBACK:\nIf no clear pain is publicly evident, return confidence: \"low\" and pain: \"Trigger event present but pain undeclared — needs human review.\"", "notes": "Uses actionKey 'use-ai' NOT 'ai' — see action-registry.md"},
+    {"name": "suppression_check", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["company_domain"], "run_condition": null, "config": {}, "formula_text": "LOOKUP({{SUPPRESSION_TABLE_ID}}, company_domain) != NULL", "claygent_prompt": null, "notes": "Customer / opt-out lookup"},
+    {"name": "route_to", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["suppression_check", "account_tier"], "run_condition": null, "config": {}, "formula_text": "IF(suppression_check == TRUE, \"SUPPRESSED\", IF(account_tier == \"T1\", \"SDR_QUEUE_T1\", IF(account_tier == \"T2\", \"MARKETING_NURTURE\", IF(account_tier == \"T3\", \"PROGRAMMATIC\", \"DISQUALIFIED\"))))", "claygent_prompt": null, "notes": null},
+    {"name": "assigned_sdr", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["route_to"], "run_condition": "route_to = \"SDR_QUEUE_T1\"", "config": {}, "formula_text": "{{SDR_POOL_LIST}}[MOD(ROW_INDEX, LENGTH({{SDR_POOL_LIST}}))]", "claygent_prompt": null, "notes": "Round-robin"},
+    {"name": "slack_message", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["account_tier", "pain_research", "assigned_sdr"], "run_condition": "account_tier = \"T1\"", "config": {}, "formula_text": "CONCAT(\"🎯 *T1 Account — \", company_name, \"* (\", industry, \", \", employee_count, \" emp)\\nTrigger: \", trigger_event, \" (\", trigger_recency_days, \"d ago)\\nPain hypothesis: \", pain_research.pain, \"\\nEvidence: \", pain_research.evidence_url, \" (confidence: \", pain_research.confidence, \")\\nAssigned: <@\", assigned_sdr, \">\")", "claygent_prompt": null, "notes": null}
+  ],
+  "actions": [
+    {"name": "hubspot_upsert", "type": "crm_create", "run_condition": "route_to != \"DISQUALIFIED\" AND route_to != \"SUPPRESSED\"", "config": {"object_type": "company", "dedup_key": "company_domain", "list_id": "{{HUBSPOT_LIST_ID}}"}, "notes": "Dedup on domain only"},
+    {"name": "slack_notify", "type": "slack", "run_condition": "account_tier = \"T1\"", "config": {"channel": "{{SLACK_CHANNEL}}", "message_column": "slack_message"}, "notes": "Cap to 10/day if T1 spikes"}
+  ],
+  "verification_checklist": [
+    "5-row sample: industry/size/geo enrich (>80% success)",
+    "pass_1_qualified matches manual judgment on 5/5",
+    "25-row sample: trigger event match rate >= 25%",
+    "Tier distribution: T1 5-10%, T2 20-30%, T3 remainder",
+    "Suppression check catches known customer",
+    "Slack alert formats correctly on a known T1",
+    "HubSpot upsert dedups on second run",
+    "Total credits per qualified account <= 15"
+  ]
+}

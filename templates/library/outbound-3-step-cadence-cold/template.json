@@ -1,0 +1,61 @@
+{
+  "schema_version": "1.0",
+  "template": {
+    "slug": "outbound-3-step-cadence-cold",
+    "name": "Outbound — 3-Step Cold Cadence (Email + LinkedIn)",
+    "version": "1.0",
+    "description": "Contact-keyed cold outbound workbook. Takes a verified-email contact list, generates per-contact first line + subject line via Claygent, gates strictly on Sending Gate, and pushes to a sequencer with per-step eligibility (email-1, LinkedIn-connect, email-2). Designed to attach to abm-account-keyed-tier-1 + an email waterfall.",
+    "use_case": "outbound",
+    "motion": "slg",
+    "created_at": "2026-06-10",
+    "created_from_workbook_id": "golden-ref-03-cadence-subset",
+    "estimated_cost_per_row": "10-12 credits per contact at the Claygent layer (assumes email waterfall ran upstream)",
+    "expected_match_rate": "Sending Gate pass rate: 50-70% of enriched rows; Read-Out-Loud pass on first lines: target 18/20",
+    "required_resources": ["Upstream email waterfall (us-smb or eu)", "Suppression table", "Claygent (use-ai)", "SalesLoft or Outreach or Apollo or Smartlead or 11x", "HubSpot or Salesforce"]
+  },
+  "intake_defaults": {
+    "source_type": "contact_list_with_verified_email",
+    "cadence_steps": 3,
+    "step_1_channel": "email",
+    "step_2_channel": "linkedin_connect",
+    "step_3_channel": "email",
+    "auto_run": false
+  },
+  "columns": [
+    {"name": "contact_id", "type": "text", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": null},
+    {"name": "first_name", "type": "text", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": null},
+    {"name": "title", "type": "text", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": null},
+    {"name": "company_name", "type": "text", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": null},
+    {"name": "company_domain", "type": "text", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": null},
+    {"name": "email", "type": "text", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": "From upstream email waterfall"},
+    {"name": "email_verified_status", "type": "text", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": "valid / accept_all_high / risky / invalid"},
+    {"name": "linkedin_url", "type": "text", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": null},
+    {"name": "seniority", "type": "text", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": null},
+    {"name": "account_tier", "type": "text", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": "From upstream account workbook"},
+    {"name": "trigger_event", "type": "text", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": "From upstream account workbook (optional but feeds first_line)"},
+    {"name": "pain_research", "type": "json", "source": "input", "cost_credits": 0, "depends_on": [], "run_condition": null, "config": {}, "formula_text": null, "claygent_prompt": null, "notes": "From upstream account workbook"},
+    {"name": "suppression_check", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["email", "company_domain"], "run_condition": null, "config": {}, "formula_text": "LOOKUP({{SUPPRESSION_TABLE_ID}}, email) != NULL OR LOOKUP({{SUPPRESSION_TABLE_ID}}, company_domain) != NULL OR EXISTS(prior_contact_in_last_30_days)", "claygent_prompt": null, "notes": null},
+    {"name": "sending_gate_eligible", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["email", "email_verified_status", "linkedin_url", "suppression_check", "seniority", "account_tier"], "run_condition": null, "config": {}, "formula_text": "AND(email IS NOT NULL, email_verified_status IN [\"valid\", \"accept_all_high\"], linkedin_url IS NOT NULL, suppression_check == FALSE, seniority IN [{{TARGET_SENIORITY}}], account_tier IN [{{ELIGIBLE_TIERS}}])", "claygent_prompt": null, "notes": "Global Rule 2: required before any sequencer push"},
+    {"name": "personalization_source", "type": "claygent", "source": "use-ai", "cost_credits": 4, "depends_on": ["sending_gate_eligible", "linkedin_url"], "run_condition": "sending_gate_eligible = TRUE", "config": {"provider_key": "use-ai", "max_sources": 3, "model": "sonnet"}, "formula_text": null, "claygent_prompt": "ROLE: B2B sales researcher finding ONE specific public observation about a prospect.\n\nCONTEXT:\n- Person: {first_name} {last_name}, {title} at {company_name}\n- LinkedIn: {linkedin_url}\n- Company trigger: {trigger_event}\n- Company pain hypothesis: {pain_research.pain}\n\nSOURCES TO CHECK (max 3):\n1. Person's LinkedIn — recent post or work history\n2. Company website /about, /careers, blog\n3. Recent news / press release tied to {trigger_event}\n\nTASK:\nIdentify ONE specific observation that:\n- Is verifiably public (with URL)\n- Connects to the persona's likely day-to-day (not generic company news)\n- A peer would notice — not a robot\n\nReturn EXACT JSON:\n{\n  \"observation\": \"string (15-25 words, specific, peer-noticed)\",\n  \"url\": \"string (URL where verifiable)\",\n  \"tie_to_pain\": \"string (1 sentence connecting to their likely pain)\"\n}\n\nFALLBACK:\nIf no specific persona-level signal found, return company-level reference + low confidence.", "notes": null},
+    {"name": "first_line", "type": "claygent", "source": "use-ai", "cost_credits": 3, "depends_on": ["sending_gate_eligible", "personalization_source"], "run_condition": "sending_gate_eligible = TRUE", "config": {"provider_key": "use-ai", "max_sources": 0, "model": "sonnet"}, "formula_text": null, "claygent_prompt": "ROLE: Peer-to-peer B2B sales rep writing the OPENING line of a cold email.\n\nCONTEXT:\n- Recipient: {first_name}, {title}\n- Observation: {personalization_source.observation}\n- Tie to pain: {personalization_source.tie_to_pain}\n- URL evidence: {personalization_source.url}\n\nVOICE: {{VOICE_DESCRIPTOR}}\n\nTASK:\nWrite ONE sentence (15-25 words) that:\n- Leads with the observation (NOT \"I came across\" or \"I noticed\")\n- Sounds like a colleague, not a vendor\n- Sets up the pain naturally for sentence 2\n\nBanned words: unlock, leverage, supercharge, hope, came across, noticed\nBanned starts: \"I\", \"Hope\", \"Hi {name}\"\n\nFORMAT:\nReturn the sentence ONLY. No quotes, no signature.\n\nFALLBACK:\nReturn: \"[no personalization available]\" — this will skip step 1 via gate.", "notes": "MUST run /clay-claygent-iterator before scaling past 25 rows. Read-Out-Loud test is mandatory."},
+    {"name": "subject_line", "type": "claygent", "source": "use-ai", "cost_credits": 2, "depends_on": ["sending_gate_eligible", "trigger_event", "pain_research"], "run_condition": "sending_gate_eligible = TRUE", "config": {"provider_key": "use-ai", "max_sources": 0, "model": "sonnet"}, "formula_text": null, "claygent_prompt": "ROLE: B2B subject line writer. 3-6 words, no emoji, no ALL CAPS, no clickbait.\n\nCONTEXT:\n- Recipient: {first_name} at {company_name}\n- Trigger: {trigger_event}\n- Pain category: {pain_research.category}\n\nTASK:\nWrite a 3-6 word subject. One of these patterns:\n- \"{specific_term} at {company_name}?\"\n- \"{trigger_event} → {pain_category}?\"\n- \"{first_name} - quick context\"\n- \"{specific_noun_they_use_internally}\"\n\nFORMAT: Subject line only.", "notes": null},
+    {"name": "step_1_eligible", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["sending_gate_eligible", "first_line"], "run_condition": null, "config": {}, "formula_text": "AND(sending_gate_eligible == TRUE, LENGTH(first_line) >= 30, NOT(first_line CONTAINS \"[no personalization available]\"))", "claygent_prompt": null, "notes": "Per-step gate — Global Rule 8"},
+    {"name": "linkedin_step_eligible", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["sending_gate_eligible", "linkedin_url"], "run_condition": null, "config": {}, "formula_text": "AND(sending_gate_eligible == TRUE, linkedin_url IS NOT NULL, linkedin_connection_status != \"connected\")", "claygent_prompt": null, "notes": null},
+    {"name": "step_2_eligible", "type": "formula", "source": "clayscript", "cost_credits": 0, "depends_on": ["step_1_eligible"], "run_condition": null, "config": {}, "formula_text": "AND(step_1_eligible == TRUE, step_1_sent_at IS NOT NULL, step_1_replied != TRUE, step_1_bounced != TRUE, DAYS_SINCE(step_1_sent_at) >= 3, DAYS_SINCE(step_1_sent_at) <= 10)", "claygent_prompt": null, "notes": "Includes bounce check — common omission"}
+  ],
+  "actions": [
+    {"name": "sequencer_push_step_1", "type": "sequencer_push", "run_condition": "step_1_eligible = TRUE", "config": {"sequencer": "{{SEQUENCER_PLATFORM}}", "cadence_id": "{{CADENCE_ID_STEP_1}}", "field_mapping": {"email": "email", "first_name": "first_name", "company_name": "company_name", "custom_first_line": "first_line", "custom_subject": "subject_line"}}, "notes": null},
+    {"name": "sequencer_push_linkedin", "type": "sequencer_push", "run_condition": "linkedin_step_eligible = TRUE", "config": {"sequencer": "{{LINKEDIN_AUTOMATION_PLATFORM}}", "cadence_id": "{{CADENCE_ID_LINKEDIN}}", "field_mapping": {"linkedin_url": "linkedin_url", "first_name": "first_name"}}, "notes": "Optional — only if LinkedIn automation tool connected"},
+    {"name": "crm_upsert", "type": "crm_create", "run_condition": "sending_gate_eligible = TRUE", "config": {"object_type": "contact", "dedup_key": "email"}, "notes": null}
+  ],
+  "verification_checklist": [
+    "1-account / 2-contact sample: contacts_found returns valid people",
+    "Sending Gate filter manually verified on 20 rows (no false TRUEs)",
+    "Read-Out-Loud first lines: 18/20 pass peer-tone test",
+    "Subject lines all 3-6 words, no emoji, no clichés",
+    "Sequencer test push lands 5 contacts in cadence correctly",
+    "CRM dedups (no duplicate contacts on resubmit)",
+    "Step 2 cadence respects 3-10 day window AND bounce/reply checks",
+    "Bounce rate < 2% after first 100 sends"
+  ]
+}

@@ -101,9 +101,12 @@ Restart Claude Code. All 16 sub-skills should now resolve.
 
 ## Known polish items still open
 
-- `templates/library/` is registered but currently empty. The 10 bootstrap templates listed in `/clay-template-library` SKILL.md will land in a follow-up.
-- `resources/global-rules.md` doesn't yet cross-reference the 10 new sub-skills.
 - Social preview image not yet uploaded (manual GitHub Settings step).
+
+## Post-release follow-ups (landed after v2.0.0 tag)
+
+- ✅ `resources/global-rules.md` now cross-references all 10 new sub-skills under each of the 8 rules.
+- ✅ `templates/library/` seeded with the 10 bootstrap templates (each with `template.json` + `README.md`) plus a stage-grouped `INDEX.md` catalog.
 
 ---
 
