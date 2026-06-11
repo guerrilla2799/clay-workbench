@@ -43,7 +43,7 @@ Account-keyed ABM workbook with two-pass ICP gate, trigger-event qualification, 
 - Expected match rate: 25% pass_1 → 5–10% T1
 
 ## Known good for
-- Anonymized from production patterns used at Dodge ENT ABM (T1 trigger-driven outbound)
+- Anonymized from production patterns for T1 trigger-driven account-keyed outbound
 
 ## Notes / Gotchas
 - The `pain_research` Claygent column uses `actionKey: "use-ai"` NOT `"ai"` — silent-drop bug if wrong
