@@ -1,0 +1,139 @@
+{
+  "name": "clay-workbench",
+  "version": "1.0.0",
+  "description": "The complete Clay.com workbook plugin for Claude Code. Hybrid router skill with 6 sub-skills covering ABM list building, multi-provider enrichment waterfalls, ICP composite scoring, outbound copy + Sending Gate + sequencer push, real-time inbound enrichment + routing, and diagnostic troubleshooting. MCP-first execution via mcp__claude_ai_Clay__* tools with manual UI walkthrough fallback. Mandatory credit pre-flight, ICP-gates-before-credits enforcement, client-voice detection.",
+  "author": {
+    "name": "Brandon Redlinger",
+    "url": "https://stackandscale.ai"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/brandonredlinger/clay-workbench"
+  },
+  "keywords": [
+    "clay",
+    "clay.com",
+    "abm",
+    "outbound",
+    "enrichment",
+    "waterfall",
+    "icp-scoring",
+    "inbound-routing",
+    "sales-engineering",
+    "gtm-engineering",
+    "revops",
+    "ai-sdr"
+  ],
+  "skills": [
+    {
+      "name": "clay-workbench",
+      "path": "SKILL.md",
+      "description": "Master router — auto-detects intent and routes to the right Clay sub-skill",
+      "command": "/clay"
+    },
+    {
+      "name": "clay-abm-list",
+      "path": "skills/clay-abm-list/SKILL.md",
+      "description": "Build account-keyed ABM target lists with firmographic + trigger gating",
+      "command": "/clay-abm-list"
+    },
+    {
+      "name": "clay-enrich-waterfall",
+      "path": "skills/clay-enrich-waterfall/SKILL.md",
+      "description": "Multi-provider email + phone + LinkedIn waterfall with graceful exit",
+      "command": "/clay-enrich-waterfall"
+    },
+    {
+      "name": "clay-icp-score",
+      "path": "skills/clay-icp-score/SKILL.md",
+      "description": "Composite 10-point ICP fit + intent score with routing by band",
+      "command": "/clay-icp-score"
+    },
+    {
+      "name": "clay-outbound",
+      "path": "skills/clay-outbound/SKILL.md",
+      "description": "Personalized outbound copy + Sending Gate + sequencer push with client-voice detection",
+      "command": "/clay-outbound"
+    },
+    {
+      "name": "clay-inbound-routing",
+      "path": "skills/clay-inbound-routing/SKILL.md",
+      "description": "Real-time webhook enrichment + scoring + routing + Slack alerting",
+      "command": "/clay-inbound-routing"
+    },
+    {
+      "name": "clay-troubleshoot",
+      "path": "skills/clay-troubleshoot/SKILL.md",
+      "description": "Diagnose broken, expensive, or under-performing Clay workbooks",
+      "command": "/clay-troubleshoot"
+    }
+  ],
+  "resources": [
+    "resources/global-rules.md",
+    "resources/intake-questions.md",
+    "resources/mcp-tool-map.md",
+    "resources/action-registry.md",
+    "resources/credit-cost-table.md",
+    "resources/client-context-detection.md",
+    "resources/clayscript-library.md",
+    "resources/ai-prompt-templates.md",
+    "resources/enrichment-benchmarks.md",
+    "resources/claygent-guide.md",
+    "resources/workflow-patterns.md"
+  ],
+  "templates": [
+    "templates/01-abm-tier1-with-triggers.md",
+    "templates/02-inbound-demo-enricher-router.md",
+    "templates/03-cold-outbound-multi-provider-waterfall.md"
+  ],
+  "providers": {
+    "enrichment": [
+      "providers/enrichment/apollo.md",
+      "providers/enrichment/findymail.md",
+      "providers/enrichment/datagma.md",
+      "providers/enrichment/dropcontact.md",
+      "providers/enrichment/zerobounce.md",
+      "providers/enrichment/hunter.md",
+      "providers/enrichment/people-data-labs.md",
+      "providers/enrichment/clearbit.md",
+      "providers/enrichment/contactout.md"
+    ],
+    "databases": [
+      "providers/databases/linkedin-sales-nav.md",
+      "providers/databases/ocean-io.md"
+    ],
+    "signals": [
+      "providers/signals/predictleads.md",
+      "providers/signals/job-changes.md",
+      "providers/signals/hiring-funding.md"
+    ],
+    "crm": [
+      "providers/crm/hubspot.md",
+      "providers/crm/salesforce.md"
+    ],
+    "sequencers": [
+      "providers/sequencers/salesloft.md",
+      "providers/sequencers/outreach.md",
+      "providers/sequencers/apollo-sequencer.md",
+      "providers/sequencers/11x.md",
+      "providers/sequencers/smartlead-instantly.md"
+    ]
+  },
+  "requires": {
+    "mcp_servers": [
+      "mcp__claude_ai_Clay"
+    ],
+    "claude_code_min_version": "1.0.0"
+  },
+  "global_rules_summary": [
+    "Gates Before Credits — ICP gate required before any paid column",
+    "Sending Gate Before Export — required before any sequencer push",
+    "Data Unification — score on full rows, not fragments",
+    "ICP Qualification First — cheapest-signal disqualification before enrichment",
+    "Free Before Paid — try free sources first in every waterfall",
+    "Never Assume — Always Ask — run 8-question intake; offer options when user defers",
+    "Clay-Managed vs Own API Key — state which side each column hits",
+    "Multiple Sending Steps — outbound assumes 2–4 step cadence, not one-shot"
+  ]
+}
