@@ -287,6 +287,8 @@ clay-workbench/
         └── INDEX.md                    # Registry of saved templates
 ```
 
+Auto-generated cross-template composition graph + per-template column DAGs live in [`docs/composition/`](docs/composition/) (regenerate via `python3 scripts/compose-graph.py`).
+
 ---
 
 ## Design provenance
