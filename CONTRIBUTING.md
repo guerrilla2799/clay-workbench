@@ -1,6 +1,6 @@
 # Contributing to clay-workbench
 
-`clay-workbench` is a Claude Code plugin for Clay.com workbook construction — 16 sub-skills covering hygiene, build, score, activate, cost/quality, and persistence. See [README.md](README.md) for the full picture.
+`clay-workbench` is a Claude Code plugin for Clay.com workbook + workflow construction — 19 sub-skills covering hygiene, source + build, score, activate, cost/quality, and persistence. See [README.md](README.md) for the full picture.
 
 Contributions are reviewed against one bar: does this make the plugin more useful to a GTM operator building real workbooks?
 
@@ -12,7 +12,7 @@ Contributions are reviewed against one bar: does this make the plugin more usefu
 - **Sub-skill improvements** — bug fixes, better intake questions, sharper Global Rules enforcement, new provider notes, additional resource refs. Open a PR.
 - **Bug fixes** — broken MCP calls, wrong action keys, stale provider docs, schema drift. Open a PR; reference the issue or describe the bug in the PR body.
 - **Documentation improvements** — clearer examples, tightened READMEs, fixed links. Open a PR.
-- **New sub-skills** — requires an issue + discussion first. The routing surface (`/clay` master router + the 16 sub-skill split) is opinionated, and adding a new sub-skill changes routing semantics. Don't open a PR cold — file an issue, agree on the slot, then build.
+- **New sub-skills** — requires an issue + discussion first. The routing surface (`/clay` master router + the 19 sub-skill split) is opinionated, and adding a new sub-skill changes routing semantics. Don't open a PR cold — file an issue, agree on the slot, then build.
 
 ---
 

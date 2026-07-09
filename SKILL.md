@@ -1,14 +1,14 @@
 ---
 name: clay-workbench
-description: Build, debug, and run Clay.com workbooks end-to-end via Claude Code. Hybrid router skill — auto-detects intent (ABM list build, enrichment waterfall, ICP scoring, outbound generation, inbound routing, troubleshooting, account research, prospect research, signal monitoring, Claygent prompt iteration, list hygiene, credit forecasting, template library, CRM data hygiene, portfolio cost audit, composite buying signals) and routes to the right sub-skill. MCP-first execution (mcp__claude_ai_Clay__*) with manual UI walkthrough fallback. Mandatory credit pre-flight, ICP-gates-before-credits enforcement, client-voice detection. Triggers — "build a Clay workbook", "Clay table", "enrich list", "Clay waterfall", "Clay ICP score", "Clay outbound", "Clay inbound enricher", "Clay router", "Clay troubleshoot", "Clay credit burn", "claygent prompt", "Clay subroutine", "account research", "prospect research", "signal monitor", "clean this list", "Clay credits", "Clay template", "data hygiene", "cost audit", "buying signals", "/clay".
+description: Build, debug, and run Clay.com workbooks AND workflows end-to-end via Claude Code. Hybrid router skill — auto-detects intent (ABM list build, TAM sourcing, workflow/automation build, enrichment waterfall, ICP scoring, outbound generation, inbound routing, troubleshooting, table debugging, account research, prospect research, signal monitoring, Claygent prompt iteration, list hygiene, credit forecasting, template library, CRM data hygiene, portfolio cost audit, composite buying signals) and routes to the right sub-skill. Tier-1-first execution via the official Clay Agent Plugin (`clay` CLI + workflow MCP tools), claude.ai connector fallback, manual UI walkthrough last. Mandatory credit pre-flight, ICP-gates-before-credits enforcement, client-voice detection. Triggers — "build a Clay workbook", "build a Clay workflow", "Clay automation", "source my TAM", "Clay table", "debug this table", "trace this record", "enrich list", "Clay waterfall", "Clay ICP score", "Clay outbound", "Clay inbound enricher", "Clay router", "Clay troubleshoot", "Clay credit burn", "claygent prompt", "Clay subroutine", "Clay routine", "account research", "prospect research", "signal monitor", "clean this list", "Clay credits", "Clay template", "data hygiene", "cost audit", "buying signals", "/clay".
 ---
 
 # Clay Workbench
 
-The router skill for Clay.com workbook construction inside Claude Code. Delegates to 16 sub-skills based on detected intent.
+The router skill for Clay.com workbook and workflow construction inside Claude Code. Delegates to 19 sub-skills based on detected intent.
 
 **Architecture**: Hybrid router + sub-skill pack.
-**Execution**: Clay MCP first, manual UI walkthrough fallback.
+**Execution**: 3-tier — official Clay Agent Plugin first (`clay` CLI + workflow MCP tools), claude.ai connector second, manual UI walkthrough last. Full policy: `resources/execution-surface.md`.
 **Voice**: Client-agnostic core, with client-context detection routing to messaging skills.
 
 ---
@@ -34,8 +34,8 @@ Violation requires explicit `gate-override: <reason>` declaration.
 
 **DO NOT trigger this skill** when the user wants to:
 
-- Run an existing Clay subroutine that's already built → use `mcp__claude_ai_Clay__run_subroutine` directly.
-- Ask a single question about Clay data → use `mcp__claude_ai_Clay__ask-question-about-accounts`.
+- Run an existing Clay routine that's already built → use `clay routines runs start` (or `mcp__claude_ai_Clay__run_subroutine`) directly.
+- Ask a single question about Clay data → use the `table` MCP tool or `mcp__claude_ai_Clay__ask-question-about-accounts`.
 - Generic CRM / sequencer questions unrelated to Clay → don't load.
 
 **DO trigger** when the user wants to:
@@ -55,6 +55,8 @@ Violation requires explicit `gate-override: <reason>` declaration.
 |-------------|-----------|-----------------|----------------|
 | Pre-clean a source list before any paid run | `clay-list-clean` | "clean this list", "list hygiene", "dedup", "normalize domains", "suppression", "scrub the list", "prep CSV for Clay" | 20-column hygiene table — domain/email/title/geo normalization + dedup + suppression filter + drop_reason report |
 | Ongoing CRM data hygiene (decay / dedup / refresh) | `clay-data-hygiene` | "data hygiene", "CRM dedup", "decay detection", "stale records", "enrichment refresh", "data freshness", "dirty HubSpot", "Salesforce duplicates" | 3 linked tables — `crm_record_health` (rolling freshness) + `crm_duplicates` (weekly dedup) + `refresh_queue` (prioritized re-enrichment) |
+| Source TAM from Clay's native dataset (no table) | `clay-tam-source` | "source my TAM", "how big is my TAM", "pull companies from Clay", "search Clay for prospects", "prospecting universe", "market sizing" | Structured-filter search over Clay's companies + people dataset — sizing probe, paged pull, suppression dedup, handoff to hygiene/ABM build |
+| Build a Clay Workflow / automation (agent + tool nodes) | `clay-workflow-build` | "build a Clay workflow", "Clay automation", "automate this in Clay", "workflow nodes", "Claygent workflow", "wire up a workflow" | Graph-based workflow via official plugin write access — gate node before paid nodes, validated, snapshot-protected, 5/25 tested, productionized as a routine |
 | Build a list of target accounts | `clay-abm-list` | "ABM list", "target accounts", "Tier 1 accounts", "build account list", "expansion list" | Account-keyed workbook with firmographics + triggers + ICP gate |
 | Deep account briefs (multi-source Claygent) | `clay-account-research` | "account research", "account brief", "company deep dive", "one-pager on", "ABM research", "executive prep" | Account-keyed workbook returning priorities + news + hiring + leadership + competitive + entry-point hypothesis per company |
 | Deep person briefs (multi-source Claygent) | `clay-prospect-research` | "prospect research", "person research", "contact dossier", "deep dive on a person", "exec prep", "warm intro mapping" | Person-keyed workbook returning activity + POVs + role scope + mutual connections + personalized entry line per contact |
@@ -69,6 +71,7 @@ Violation requires explicit `gate-override: <reason>` declaration.
 | Portfolio-wide cost + Global Rules audit | `clay-cost-audit` | "Clay cost audit", "audit all workbooks", "Clay portfolio review", "Global Rules audit", "monthly Clay review", "tier renewal prep" | 12-check audit across every workbook with ranked violations + fix recipes + projected savings |
 | Save / load / version reusable workbook templates | `clay-template-library` | "save this as a template", "load template", "Clay template", "template library", "clone workbook", "version this workbook" | Persistence layer — anonymized template.json + README per template + INDEX.md catalog with SAVE/LOAD/LIST/DIFF/VERSION/SHARE modes |
 | Diagnose a broken or expensive workbook | `clay-troubleshoot` | "Clay is expensive", "match rate is low", "Clay error", "credits burning", "wrong rows enriched" | Root-cause diagnostic + fix recipe + cost-savings estimate |
+| Record-level / mechanical table debugging | `clay-table-debug` | "debug this table", "trace this record", "why is this cell empty", "what's erroring", "failed rows", "import stuck", "explain this table" | Symptom-routed debugging via official table-analyze / trace / value-trace / error-sweep / capacity skills, translated into Global Rules terms |
 
 ### Ambiguity Resolution
 
@@ -93,22 +96,25 @@ Step 3 — Workbook Composition  ← specialized per sub-skill
         Output: column-by-column spec markdown table
 
 Step 4 — Credit Pre-Flight
-        See: resources/credit-cost-table.md, resources/mcp-tool-map.md
+        See: resources/credit-cost-table.md, resources/execution-surface.md
         Output:
-          - get-credits-available (current balance)
+          - clay credits (Tier 1) or get-credits-available (Tier 2) → current balance
           - estimated credits per row × row count
           - cost in dollars at user's tier
           - confirm/cancel prompt
 
 Step 5 — Execute or Walkthrough  ← specialized per sub-skill
-        Path A — MCP execution (preferred):
-          - list_subroutines if existing subroutine matches
-          - run_subroutine with mapped inputs
-          - find-and-enrich-* primitives for ad-hoc
-        Path B — Manual walkthrough (fallback when MCP gap):
+        Tier 1 — Official Agent Plugin (preferred):
+          - clay routines list/get/runs for saved routines
+          - clay workflows create + edit_node/validate_workflow for automations
+          - clay tables query / table MCP tool for state
+          - clay webhooks create for inbound sources
+        Tier 2 — claude.ai connector (fallback + ad-hoc primitives):
+          - find-and-enrich-* primitives, run_subroutine
+        Tier 3 — Manual walkthrough (UI-only residue):
           - Step-by-step UI instructions
           - Column-by-column formula text
-          - Configuration screenshots noted (where in UI)
+          - Trigger configuration (audience / webhook / table)
 
 Step 6 — Verify + Handoff
         Output:
@@ -135,7 +141,7 @@ Without client context, fall back to universal frameworks (no fabrication).
 Before any operation that touches more than **100 rows** OR uses any **paid waterfall**:
 
 ```
-1. Call mcp__claude_ai_Clay__get-credits-available
+1. Run `clay credits` (Tier 1); fallback mcp__claude_ai_Clay__get-credits-available
 2. Compute estimate from credit-cost-table.md:
    credits_per_row × row_count = total
 3. Block if: total > balance × 0.5
@@ -157,7 +163,8 @@ No exceptions. This is enforcement of Global Rule #1.
 |------|---------|
 | `resources/global-rules.md` | The 8 non-negotiables — load every time |
 | `resources/intake-questions.md` | 8-question intake script |
-| `resources/mcp-tool-map.md` | When to use which `mcp__claude_ai_Clay__*` tool |
+| `resources/execution-surface.md` | **The 3-tier execution policy — which Clay interface to use, always resolve here first** |
+| `resources/mcp-tool-map.md` | Tier-2 connector reference — `mcp__claude_ai_Clay__*` tools |
 | `resources/action-registry.md` | Clay action keys, packages, gotchas |
 | `resources/credit-cost-table.md` | Provider costs for pre-flight estimation |
 | `resources/client-context-detection.md` | Routing to client messaging skills |
@@ -180,6 +187,8 @@ No exceptions. This is enforcement of Global Rule #1.
 |-----------|---------------|
 | `skills/clay-list-clean/SKILL.md` | `/clay-list-clean` |
 | `skills/clay-data-hygiene/SKILL.md` | `/clay-data-hygiene` |
+| `skills/clay-tam-source/SKILL.md` | `/clay-tam-source` |
+| `skills/clay-workflow-build/SKILL.md` | `/clay-workflow-build` |
 | `skills/clay-abm-list/SKILL.md` | `/clay-abm-list` |
 | `skills/clay-account-research/SKILL.md` | `/clay-account-research` |
 | `skills/clay-prospect-research/SKILL.md` | `/clay-prospect-research` |
@@ -194,6 +203,7 @@ No exceptions. This is enforcement of Global Rule #1.
 | `skills/clay-cost-audit/SKILL.md` | `/clay-cost-audit` |
 | `skills/clay-template-library/SKILL.md` | `/clay-template-library` |
 | `skills/clay-troubleshoot/SKILL.md` | `/clay-troubleshoot` |
+| `skills/clay-table-debug/SKILL.md` | `/clay-table-debug` |
 
 ---
 
@@ -207,6 +217,8 @@ Hygiene & data quality:
 /clay-data-hygiene        → ongoing CRM dedup + decay detection + refresh queue
 
 Build:
+/clay-tam-source          → source TAM from Clay's native dataset (search, no table)
+/clay-workflow-build      → build a Clay Workflow (agent + tool nodes) via the Agent Plugin
 /clay-abm-list            → build a Tier 1/2/3 ABM account workbook
 /clay-account-research    → multi-source account brief generator
 /clay-prospect-research   → person-level deep research dossier
@@ -226,12 +238,13 @@ Quality & cost:
 /clay-credits             → credit forecast + provider comparison + ROI
 /clay-cost-audit          → portfolio audit (12 checks across all workbooks)
 /clay-troubleshoot        → diagnose burn rate, low match, or broken column
+/clay-table-debug         → trace records, cells, errors, stuck imports (mechanical)
 
 Persistence:
 /clay-template-library    → save / load / version reusable workbook templates
 ```
 
-When user types `/clay` without context, ask: "What are you building today?" and offer the 16 sub-skill options grouped by stage.
+When user types `/clay` without context, ask: "What are you building today?" and offer the 19 sub-skill options grouped by stage.
 
 ---
 
@@ -241,7 +254,7 @@ Every sub-skill returns this 4-part deliverable:
 
 1. **Column-by-column spec** — markdown table: `column_name | source/provider | type | cost | depends_on`
 2. **Pre-flight estimate** — `N rows × X credits/row = Y credits ≈ $Z`
-3. **Execution plan** — either MCP tool calls (preferred) or numbered UI walkthrough (fallback)
+3. **Execution plan** — Tier 1 CLI/MCP calls (preferred), Tier 2 connector tools, or numbered UI walkthrough (Tier 3)
 4. **Verify-and-handoff checklist** — 5-row sample → 25-row → full, with success thresholds per step
 
 This is the contract. Do not deviate.

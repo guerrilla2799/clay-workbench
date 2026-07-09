@@ -7,6 +7,8 @@ description: Diagnose broken, expensive, or under-performing Clay workbooks. Roo
 
 The diagnostic skill. Run this when something is wrong with an existing Clay workbook — costs too high, match rates too low, formulas misbehaving, sequencer pushing the wrong rows.
 
+**Boundary with `/clay-table-debug`:** record-level or mechanical symptoms — a specific row, a specific cell, an error message, a stuck import — route to `/clay-table-debug`, which wraps the official table-analyze / table-trace / table-value-trace / table-error-sweep / table-capacity skills. clay-troubleshoot keeps the economic diagnosis: burn, match rates, ROI.
+
 Inherits master workflow but specializes: skips intake (focuses on diagnosis), specializes step 3 (root cause) and step 5 (fix execution).
 
 ---
@@ -193,7 +195,7 @@ When the user runs this skill, return:
 
 **Fix**:
 ```
-1. mcp__claude_ai_Clay__get-task on the failing job.
+1. clay tables rows / clay tables query on the failing rows (Tier 2 fallback: mcp__claude_ai_Clay__get-task on the failing job).
 2. Look at error_message field in failed rows.
 3. Rate limit → throttle or upgrade provider tier.
 4. Malformed input → add input validation formula column upstream.
@@ -223,7 +225,7 @@ When the user runs this skill, return:
 
 **Fix**:
 ```
-1. mcp__claude_ai_Clay__query-objects on the score column for last 30d.
+1. clay tables query on the score column for last 30d (Tier 2 fallback: mcp__claude_ai_Clay__query-objects).
 2. Compare distribution to baseline 90d ago.
 3. Identify which sub-score component shifted (fit_industry, intent_trigger, etc.).
 4. Inspect the upstream — is the input data changing shape?
@@ -235,12 +237,15 @@ When the user runs this skill, return:
 
 ## Step 5 — Execution
 
+### Preferred Path: Tier 1 (official Agent Plugin) — see resources/execution-surface.md
+
 ```
-1. mcp__claude_ai_Clay__query-objects on the offending table
-2. Pull representative sample of problem rows
-3. Apply triage tree above
-4. Output diagnostic in standard format
-5. Offer to apply fix (if MCP-supported) or walk through manually
+1. clay credits → balance, if burn is the symptom (Tier 2 fallback: mcp__claude_ai_Clay__get-credits-available)
+2. clay tables get + clay tables columns on the offending table → structure, column config, run conditions
+3. clay tables rows / clay tables query → representative sample of problem rows (Tier 2 fallback: mcp__claude_ai_Clay__query-objects)
+4. Apply triage tree above
+5. Output diagnostic in standard format
+6. Offer to apply fix (Tier 1 where supported) or walk through manually (Tier 3)
 ```
 
 ---
@@ -264,6 +269,7 @@ When the user runs this skill, return:
 
 ## Related
 
+- For record-level / mechanical debugging (specific row, cell, error, stuck import) → `/clay-table-debug`.
 - After fix → re-validate via the original sub-skill's verify-and-handoff checklist.
 - For systemic issues across many workbooks → review `resources/global-rules.md` enforcement.
 - For provider-specific quirks → see `providers/enrichment/*.md`.

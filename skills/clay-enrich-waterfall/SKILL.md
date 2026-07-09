@@ -83,24 +83,27 @@ Usually returned by contact-finding step. If not:
 
 ## Step 5 — Execution (Specialized)
 
-### Preferred Path: MCP
+### Preferred Path: Tier 1 (official Agent Plugin) — see resources/execution-surface.md
 
 ```
-1. mcp__claude_ai_Clay__get-credits-available
+1. clay credits — balance pre-flight
 2. Estimate: row_count × waterfall_per_row × (1 + phone_per_row × phone_flag)
 3. Pre-flight prompt
-4. Find existing subroutine:
-   mcp__claude_ai_Clay__list_subroutines
+4. Find existing routine:
+   clay routines list
    → "Email Waterfall" or "Contact Enrichment" likely exists
-5. If subroutine exists:
-   mcp__claude_ai_Clay__get_subroutine_input_options
-   → mcp__claude_ai_Clay__run_subroutine with mapped inputs
-6. If no subroutine — for ad-hoc:
-   mcp__claude_ai_Clay__find-and-enrich-list-of-contacts
+5. If routine exists:
+   clay routines get → map inputs
+   → clay routines runs to launch + poll status
+6. If no routine — for ad-hoc:
+   mcp__claude_ai_Clay__find-and-enrich-list-of-contacts (Tier 2 — connector)
    → returns contacts with email/phone/LinkedIn already waterfallled
+   → verify results via clay tables rows/query or the `table` MCP tool
 ```
 
-### Manual Fallback — Build the Waterfall in Clay UI
+### Manual Fallback (Tier 3) — Build the Waterfall in Clay UI
+
+Enrichment-column setup and run conditions are still UI-only (see resources/execution-surface.md):
 
 1. In an existing contact-keyed table, + Add Column → **Enrichment** → search "email waterfall" → select Clay's prebuilt **or** chain providers manually.
 2. **Chain providers manually** for cost control:
@@ -179,6 +182,7 @@ If actuals lag benchmarks by >15%, route to `/clay-troubleshoot`.
 
 ## Related
 
+- For sourcing TAM upstream (no table needed) → `/clay-tam-source` via `clay search filters-mode`.
 - Source of contacts → `/clay-abm-list` (account list) + persona definition
 - After enrichment → `/clay-icp-score` (rank), `/clay-outbound` (generate copy)
 - Match rate too low → `/clay-troubleshoot`

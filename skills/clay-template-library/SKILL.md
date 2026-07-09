@@ -166,7 +166,7 @@ Never save raw client data, suppression lists, or proprietary trigger rubrics in
 ### Step 5 — SAVE Execution
 
 ```
-1. mcp__claude_ai_Clay__query-objects on the source workbook to enumerate columns
+1. clay tables get + clay tables columns on the source workbook to enumerate columns (Tier 2 fallback: mcp__claude_ai_Clay__query-objects)
 2. For each column → extract: name, type, provider, formula text, claygent prompt, run condition, cost estimate
 3. Apply anonymization rules
 4. Compose template.json
@@ -194,9 +194,10 @@ Never save raw client data, suppression lists, or proprietary trigger rubrics in
 3. For client-voice columns (outbound copy), detect client name and load matching messaging skill
 4. Output a column-by-column composition spec (matches the format of the master workflow step 3)
 5. Run /clay-credits in forecast mode with the filled spec
-6. Confirm with user → proceed to either:
-   - MCP: walk through column-by-column creation (Clay MCP doesn't yet support full workbook import from JSON)
-   - Manual: produce a numbered Clay UI walkthrough
+6. Confirm with user → proceed to one of:
+   - Tier 1 (workflow templates): re-instantiate via clay workflows create + edit_node per node → validate_workflow (see /clay-workflow-build)
+   - Tier 1/2 (table templates): walk through column-by-column creation (full table import from JSON still not supported)
+   - Manual (Tier 3): produce a numbered Clay UI walkthrough
 7. After workbook built → run 5/25/full verification per master workflow step 6
 ```
 
@@ -248,7 +249,7 @@ Output: changelog-style markdown
 
 ## EXPORT Mode
 
-The automated round-trip. Where SAVE assumes manual or hybrid composition, EXPORT reads a **live Clay subroutine or table** via MCP, extracts the complete structure, applies workspace-portability transforms + anonymization, and writes a portable `template.json` that can be loaded into a different Clay workspace.
+The automated round-trip. Where SAVE assumes manual or hybrid composition, EXPORT reads a **live Clay workflow, routine, or table** — Tier 1 preferred (`clay workflows get`, `clay routines get`, `clay tables get/columns`), connector fallback — extracts the complete structure, applies workspace-portability transforms + anonymization, and writes a portable `template.json` that can be loaded into a different Clay workspace. Workflow templates can be re-instantiated via `clay workflows create` + `edit_node` (see `/clay-workflow-build`).
 
 This is the canonical way to add templates to the library going forward — manual JSON authoring (the bootstrap method) only happens when no live workbook exists yet.
 
@@ -263,7 +264,7 @@ This is the canonical way to add templates to the library going forward — manu
 
 ### Inputs
 
-- Source: **subroutine_id** (preferred) OR table_id (fallback for un-promoted workbooks)
+- Source: **workflow_id or routine_id** (preferred) OR table_id (fallback for un-promoted workbooks)
 - Target template slug (kebab-case, will mkdir at `templates/library/<slug>/`)
 - Anonymization profile (default: standard rules; advanced: custom denylist + allowlist)
 - Include actions? (default: yes, with action targets abstracted to placeholders)
@@ -271,13 +272,17 @@ This is the canonical way to add templates to the library going forward — manu
 ### Execution
 
 ```
-1. Identify source:
-   - If subroutine_id provided:
-       mcp__claude_ai_Clay__list_subroutines        # confirm it exists
-       mcp__claude_ai_Clay__get_subroutine_input_options   # get input schema
+1. Identify source (Tier 1 preferred):
+   - If workflow_id provided:
+       clay workflows get <id>          # full workflow config
+       clay workflows snapshots <id>    # version history — pin the snapshot exported
+   - If routine_id provided:
+       clay routines get <routineId>    # routine config + input schema
+       (Tier 2 fallback: mcp__claude_ai_Clay__list_subroutines + get_subroutine_input_options)
    - If table_id provided:
-       mcp__claude_ai_Clay__query-objects           # enumerate columns + actions
-       (mark template as "table-sourced, not subroutine-promoted" in description)
+       clay tables get <id> + clay tables columns <id>   # table schema
+       (Tier 2 fallback: mcp__claude_ai_Clay__query-objects)
+       (mark template as "table-sourced, not routine-promoted" in description)
 
 2. For each column extracted, capture:
    - name, type (text | number | formula | enrichment | claygent | action)
@@ -427,7 +432,7 @@ For SAVE:
 - [ ] Decision made: keep local OR commit to repo
 
 For EXPORT:
-- [ ] Source subroutine_id or table_id confirmed live (MCP returns metadata)
+- [ ] Source workflow_id / routine_id / table_id confirmed live (Tier 1 or Tier 2 returns metadata)
 - [ ] All extracted columns have their `depends_on` references intact (no orphans)
 - [ ] Workspace-portability transforms applied — every workspace-specific ID is a `{{PLACEHOLDER}}`
 - [ ] Anonymization transforms applied — every client identifier is a `{{PLACEHOLDER}}`

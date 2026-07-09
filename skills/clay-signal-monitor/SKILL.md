@@ -151,16 +151,16 @@ Build as a Slack action with the formula above as `text`. One channel per tier o
 4. ONLY THEN set `auto_run = TRUE` on the table — for monitors specifically, auto_run is the point
 ```
 
-### MCP Path
+### Preferred Path: Tier 1 (official Agent Plugin) — see resources/execution-surface.md
 
 ```
-1. mcp__claude_ai_Clay__get-credits-available
-2. mcp__claude_ai_Clay__list_subroutines → if "Signal Monitor" subroutine exists, prefer it
-3. mcp__claude_ai_Clay__find-and-enrich-company / find-and-enrich-contact for backfill validation
-4. mcp__claude_ai_Clay__query-objects on signal_history → confirm dedup hash logic before enabling auto_run
+1. clay credits — balance pre-flight
+2. clay routines list → if a "Signal Monitor" routine exists, prefer it; clay routines runs for run status
+3. mcp__claude_ai_Clay__find-and-enrich-company / find-and-enrich-contact for backfill validation (Tier 2 — connector)
+4. clay tables rows / clay tables query on signal_history (or the table MCP tool) → confirm dedup hash logic before enabling auto_run
 ```
 
-### Manual Fallback
+### Manual Fallback (Tier 3)
 
 1. New table → `"Signal Monitor — {signal_class} — {watch_source}"`
 2. Connect source integration → set incremental sync
@@ -241,4 +241,5 @@ If user provisions monitor across 5 signal types and 5000 accounts, pre-flight e
 - For pairing signal with deep account context before alerting → `/clay-account-research`.
 - For pairing signal with person-level entry hook → `/clay-prospect-research`.
 - For the outbound play triggered by a HOT signal → `/clay-outbound`.
+- Recurring monitors can be productionized as routines via `clay routines create` once built as workflows → `/clay-workflow-build`.
 - For burn-rate audits on long-running monitors → `/clay-troubleshoot`.

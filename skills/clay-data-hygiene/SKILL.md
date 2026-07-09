@@ -160,24 +160,29 @@ Table B (dedup):
 
 Table C (refresh queue):
   - Cadence: daily
-  - Take top `refresh_eligible_today` from queue → trigger re-enrichment via /clay-enrich-waterfall subroutine
+  - Take top `refresh_eligible_today` from queue → trigger re-enrichment via /clay-enrich-waterfall routine
   - auto_run = TRUE after backfill validation
 ```
 
-### MCP Path
+### Preferred Path: Tier 1 (official Agent Plugin) — see resources/execution-surface.md
 
 ```
-1. mcp__claude_ai_Clay__get-credits-available
-2. mcp__claude_ai_Clay__list_subroutines → confirm refresh subroutine exists
+1. clay credits — balance pre-flight
+2. clay routines list → confirm refresh routine exists (clay routines get for inputs; clay routines runs for status)
 3. Connect CRM source (HubSpot or Salesforce) → 3 Clay tables
 4. Build columns per spec
-5. Run 25-row backfill on Table A → eyeball freshness_score distribution against intuition
-6. Run weekly Table B → manually merge or flag 5 duplicate clusters before flipping auto_run
-7. Queue first day of Table C → review priority_score top 20 by hand
-8. Flip auto_run = TRUE on each table only after its respective review
+5. Enable structured reads on each CRM-synced table: clay tables update (per-table enable)
+   → clay tables query becomes the recurring read path (structured JSON, paginated)
+6. Run 25-row backfill on Table A → eyeball freshness_score distribution against intuition
+   (clay tables rows/query or the `table` MCP tool)
+7. Run weekly Table B → manually merge or flag 5 duplicate clusters before flipping auto_run
+8. Queue first day of Table C → review priority_score top 20 by hand
+9. Flip auto_run = TRUE on each table only after its respective review
 ```
 
-### Manual Fallback
+### Manual Fallback (Tier 3)
+
+Table creation and column-formula edits are still UI-only (see resources/execution-surface.md):
 
 1. Create 3 tables in Clay UI per the column specs
 2. Connect CRM source(s); make sure CRM permission scope includes write-back if auto-update is on
@@ -258,7 +263,7 @@ If estimate is shocking, default suggestion: shrink scope (T1 + T2 accounts only
 ## Related
 
 - For one-shot pre-Clay input cleanup → `/clay-list-clean` (different scope, different timing).
-- For the refresh enrichment action triggered by Table C → `/clay-enrich-waterfall` (the subroutine called from refresh_queue).
+- For the refresh enrichment action triggered by Table C → `/clay-enrich-waterfall` (the routine called from refresh_queue).
 - For ongoing trigger monitoring that pairs with role-change detection → `/clay-signal-monitor`.
 - For Claygent prompt tuning on the title/company match columns → `/clay-claygent-iterator`.
 - For portfolio-wide cost audit of this skill's recurring runs → `/clay-cost-audit`.

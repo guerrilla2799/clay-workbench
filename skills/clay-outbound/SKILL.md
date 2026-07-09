@@ -157,25 +157,28 @@ sending_gate_eligible == TRUE AND linkedin_url IS NOT NULL
 5. Only then move to the 25-row run.
 ```
 
-### Sequencer Push
+### Sequencer Push — Preferred Path: Tier 1 (official Agent Plugin) — see resources/execution-surface.md
 
 ```
-1. mcp__claude_ai_Clay__list_subroutines
-   → Look for "Push to {sequencer}" subroutine
-2. If exists:
-   mcp__claude_ai_Clay__get_subroutine_input_options
-   → Map columns to expected fields
-   → mcp__claude_ai_Clay__run_subroutine with sending_gate_eligible filter
-3. If not exists — manual:
-   In Clay UI:
+1. clay credits — balance pre-flight before generating copy at scale
+2. clay routines list
+   → Look for "Push to {sequencer}" routine
+3. If exists:
+   clay routines get <id>
+   → Map columns to expected inputs
+   → Trigger with sending_gate_eligible filter; poll clay routines runs <id> for status
+   (Tier 2 — connector: list_subroutines / get_subroutine_input_options /
+   run_subroutine, same filter)
+4. If not exists — Manual Fallback (Tier 3), in Clay UI
+   (push actions on a table are still UI-configured):
    a. + Add Action → push-{sequencer}
    b. Map fields (email, first_name, last_name, company_name, custom fields)
    c. CRITICAL: Set Run Condition on action to `sending_gate_eligible = TRUE`
    d. Optional per-step conditions: step_1_eligible, step_2_eligible
    e. Save action
-4. Test on 5-row sample.
-5. Verify in destination sequencer that 5 contacts appear correctly.
-6. Full push only after sample verifies.
+5. Test on 5-row sample — confirm state with clay tables rows or the table MCP tool.
+6. Verify in destination sequencer that 5 contacts appear correctly.
+7. Full push only after sample verifies.
 ```
 
 ### 11x AI SDR Push (Coordination Note)

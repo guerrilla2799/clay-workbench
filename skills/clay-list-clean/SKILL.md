@@ -146,21 +146,23 @@ CASE(
 
 ## Step 5 — Execution (Specialized)
 
-### Preferred Path: MCP
+### Preferred Path: Tier 1 (official Agent Plugin) — see resources/execution-surface.md
 
 ```
-1. mcp__claude_ai_Clay__get-credits-available (this skill costs ~0 credits — all formulas)
+1. clay credits — balance pre-flight (this skill costs ~0 credits — all formulas)
 2. Load source via:
    - CSV upload → Clay table
-   - HubSpot view → mcp__claude_ai_Clay__query-objects to pull, then re-import
+   - HubSpot view → mcp__claude_ai_Clay__query-objects (Tier 2 — connector) to pull, then re-import
    - Salesforce report → CSV bridge
 3. Append the 20 hygiene columns
 4. Run formulas — instant (no credits)
-5. Pull the report: count by drop_reason
+5. Pull the report via `clay tables rows/query` or the `table` MCP tool: count by drop_reason
 6. Hand back: cleaned table view (filter row_passes = TRUE) + reject view (filter row_passes = FALSE, grouped by drop_reason)
 ```
 
-### Manual Fallback
+### Manual Fallback (Tier 3)
+
+Table creation and column-formula edits are still UI-only (see resources/execution-surface.md):
 
 1. New table → `"Hygiene — {source descriptor} — {date}"`
 2. Source → CSV / HubSpot view / Salesforce report

@@ -132,17 +132,21 @@ Before deploying the score in production routing, **back-test against historical
 
 If back-test data unavailable: ship the rubric **observably** (mark all scores in CRM but don't route on them) for 4 weeks, then back-test on that period.
 
-### MCP Path
+### Preferred Path: Tier 1 (official Agent Plugin) — see resources/execution-surface.md
 
 ```
-1. mcp__claude_ai_Clay__query-objects (existing scored rows)
-2. Apply the 13-column scoring as formula columns (manual UI step)
-3. mcp__claude_ai_Clay__ask-question-about-accounts:
+1. clay credits — balance pre-flight (formula columns are free; back-test enrichment isn't)
+2. clay tables rows / clay tables query — pull existing scored rows for validation
+3. Apply the 13-column scoring as formula columns — table column formulas are
+   still UI-only (Tier 3); walk the user through the Manual Fallback steps below
+4. table MCP tool — natural-language check:
    "Show score distribution by band and route_to destination"
-4. Validate distribution against expectations.
+5. Validate distribution against expectations.
 ```
 
-### Manual Fallback
+Tier 2 (connector) fallback: `query-objects` for scored rows, `ask-question-about-accounts` for the distribution check.
+
+### Manual Fallback (Tier 3)
 
 1. In the existing table, + Add Column → Formula → paste each column formula above.
 2. Order matters — `fit_score` depends on `fit_industry` etc.; place left-to-right.

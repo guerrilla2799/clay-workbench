@@ -6,15 +6,17 @@
 
 > The complete Clay.com workbook plugin for Claude Code.
 
-Build, debug, and run Clay workbooks end-to-end via Claude Code. Covers the full Clay workflow — pre-Clay list hygiene, ongoing CRM data hygiene, ABM list building, deep account + prospect research, multi-provider enrichment waterfalls, ICP fit scoring, composite buying-signal intent scoring, outbound copy with Sending Gate + sequencer push, real-time inbound routing, recurring trigger monitoring, Claygent prompt iteration, credit forecasting + provider comparison, portfolio-wide cost audit, single-workbook troubleshooting, and reusable workbook templates.
+Build, debug, and run Clay workbooks **and workflows** end-to-end via Claude Code. Covers the full Clay lifecycle — TAM sourcing from Clay's native dataset, pre-Clay list hygiene, ongoing CRM data hygiene, ABM list building, programmatic Clay Workflow construction, deep account + prospect research, multi-provider enrichment waterfalls, ICP fit scoring, composite buying-signal intent scoring, outbound copy with Sending Gate + sequencer push, real-time inbound routing with programmatic webhook creation, recurring trigger monitoring, Claygent prompt iteration, credit forecasting + provider comparison, portfolio-wide cost audit, single-workbook troubleshooting, record-level table debugging, and reusable workbook templates.
 
-**Hybrid router + 16 sub-skills. MCP-first execution with manual UI walkthrough fallback. Mandatory credit pre-flight. ICP-gates-before-credits enforcement. Client-voice detection.**
+**Hybrid router + 19 sub-skills. Tier-1-first execution on the official [Clay Agent Plugin](https://github.com/clay-run/agent-plugins) (`clay` CLI + workflow MCP tools), claude.ai connector fallback, manual UI walkthrough last. Mandatory credit pre-flight. ICP-gates-before-credits enforcement. Client-voice detection.**
+
+> **v3.0** builds on Clay's Agent Plugin open beta (Nov 2025 → open beta Jul 2026): real workflow write access (`edit_node`, `validate_workflow`, `execute_clay_action`), native-dataset search, structured table queries, webhook management, and snapshots — the things v2.x had to hand back to the UI.
 
 ---
 
 ## What this gives you
 
-16 sub-skills organized by Clay workflow stage:
+19 sub-skills organized by Clay workflow stage:
 
 ### 🧹 Hygiene & data quality
 
@@ -27,6 +29,8 @@ Build, debug, and run Clay workbooks end-to-end via Claude Code. Covers the full
 
 | Slash Command | What it builds |
 |---------------|----------------|
+| `/clay-tam-source` | TAM sourcing straight from Clay's native companies + people dataset (`clay search filters-mode`) — sizing probe, paged pull, suppression dedup, handoff to hygiene + ABM build. **New in v3.0.** |
+| `/clay-workflow-build` | Clay Workflows (Alpha) built programmatically — Claygent + tool nodes with the Global Rules enforced at the node level (gate node before paid nodes, Sending Gate before push), validated, snapshot-protected, 5/25 tested, productionized as a routine. **New in v3.0.** |
 | `/clay-abm-list` | Account-keyed ABM workbook with firmographic + trigger gating |
 | `/clay-account-research` | Deep multi-source account briefs — priorities + news + hiring + leadership + competitive + entry-point hypothesis per company |
 | `/clay-prospect-research` | Deep person-level dossiers — POVs + activity + role scope + warm path + personalized entry line per contact |
@@ -55,6 +59,7 @@ Build, debug, and run Clay workbooks end-to-end via Claude Code. Covers the full
 | `/clay-credits` | Proactive credit forecasting + multi-mix provider cost comparison + workbook ROI ranking with reallocation rec |
 | `/clay-cost-audit` | Portfolio-wide 12-check audit across every workbook (Global Rules violations + waste + ROI laggards) with executive / engineering / Slack output modes |
 | `/clay-troubleshoot` | Diagnose broken / expensive / under-performing workbooks (single-workbook reactive) |
+| `/clay-table-debug` | Record-level mechanical debugging — routes symptoms to the official table-analyze / trace / value-trace / error-sweep / capacity skills and translates findings into Global Rules terms. **New in v3.0.** |
 
 ### 💾 Persistence
 
@@ -74,7 +79,8 @@ Build, debug, and run Clay workbooks end-to-end via Claude Code. Covers the full
 
 Most Clay skills are either "consultancy markdown" (here are the steps) or "raw scripts" (here is the JSON). This one is both — and more:
 
-- **MCP-first execution.** Calls `mcp__claude_ai_Clay__*` tools directly to actually run workbooks. Falls back to step-by-step UI walkthrough when MCP can't do it yet.
+- **Tier-1-first execution.** Runs on the official Clay Agent Plugin — the `clay` CLI (JSON output, typed exit codes) plus the workflow MCP tools (`edit_node`, `validate_workflow`, `execute_clay_action`, `table`). Falls back to the claude.ai connector (`mcp__claude_ai_Clay__*`), then to step-by-step UI walkthrough for the genuinely UI-only residue. Full policy: `resources/execution-surface.md`.
+- **Real workflow write access.** v2.x could only *describe* automations; v3.0 builds them — with snapshots noted before edits, validation before runs, and a one-record action dry-run before any node is wired.
 - **Mandatory credit pre-flight.** Estimates `rows × credits/row` against your current balance before ANY paid run > 100 rows. Blocks at 50% balance threshold by default.
 - **Two-pass ICP gate as a global rule.** Cheap signals first (industry, size, geo); paid enrichments gated on pass 1. Typically cuts burn 40–60%.
 - **Strict Sending Gate.** Sequencer push requires `sending_gate_eligible = TRUE` formula column. Per-step eligibility (step 1, step 2, LinkedIn) supported out of the box.
@@ -115,6 +121,8 @@ Then register each slash command:
 SKILLS=(
   clay-list-clean
   clay-data-hygiene
+  clay-tam-source
+  clay-workflow-build
   clay-abm-list
   clay-account-research
   clay-prospect-research
@@ -128,6 +136,7 @@ SKILLS=(
   clay-credits
   clay-cost-audit
   clay-troubleshoot
+  clay-table-debug
   clay-template-library
 )
 
@@ -162,15 +171,24 @@ done
 
 The `.claude-plugin/plugin.json` manifest is included for plugin-manager-based installs. Drop the folder into your Claude Code plugins directory.
 
-### Required: Clay MCP server
+### Required: the official Clay Agent Plugin (Tier 1)
 
-This plugin assumes the **official Clay MCP server** is connected (`mcp__claude_ai_Clay__*` tools). If not:
+v3.0 executes primarily through Clay's official [Agent Plugin](https://github.com/clay-run/agent-plugins) (open beta). Install once:
 
-1. Connect at https://claude.ai/settings/connectors (or your equivalent Claude Code MCP config)
-2. Authenticate with your Clay workspace
-3. Verify with `mcp__claude_ai_Clay__list_subroutines` — should return your subroutines
+```
+claude plugin marketplace add clay-run/agent-plugins
+claude plugin install clay@clay-plugins
+clay login          # browser OAuth — shared by the CLI and the MCP server
+# restart Claude Code — `clay mcp` resolves its session at launch only
+```
 
-Without the MCP server, the plugin falls back to manual UI walkthroughs (which work but lose live execution).
+Verify: `clay whoami` returns your user + workspace with exit code 0. If anything fails, run the official plugin's `setup` skill.
+
+### Optional: claude.ai Clay connector (Tier 2)
+
+The claude.ai connector (`mcp__claude_ai_Clay__*` tools) remains the fallback and still uniquely provides the ad-hoc `find-and-enrich-*` primitives. Connect at https://claude.ai/settings/connectors and verify with `mcp__claude_ai_Clay__list_subroutines`.
+
+Without either surface, the plugin falls back to manual UI walkthroughs (which work but lose live execution). The full tier policy lives in `resources/execution-surface.md`.
 
 ---
 
@@ -188,7 +206,13 @@ Without the MCP server, the plugin falls back to manual UI walkthroughs (which w
 /clay-data-hygiene stand up ongoing dedup + decay detection on my HubSpot CRM —
                   daily freshness scan, weekly dedup, rolling refresh queue
 
-# Build
+# Source & build
+/clay-tam-source how big is my TAM for US fintech companies, 100-1000 employees,
+                Series B+ — pull the list and dedupe against my HubSpot customers
+
+/clay-workflow-build automate my inbound flow: webhook trigger → gate on ICP →
+                    enrich → draft a first line → push qualified leads to SalesLoft
+
 /clay-abm-list build a Tier 1 ABM list of B2B SaaS companies with 500-2500 employees
               that closed a Series A or B in the last 90 days
 
@@ -230,6 +254,9 @@ Without the MCP server, the plugin falls back to manual UI walkthroughs (which w
 /clay-troubleshoot my email waterfall is burning $400/day with 30% match rate —
                    diagnose and fix
 
+/clay-table-debug why is the email column empty for these 40 rows — trace it
+                  back to the source
+
 # Persistence
 /clay-template-library save the Obin Tier 1 ABM workbook as an anonymized template
                       for reuse across other clients
@@ -244,10 +271,12 @@ clay-workbench/
 ├── SKILL.md                            # Master router
 ├── .claude-plugin/
 │   └── plugin.json                     # Formal plugin manifest (v2.0.0)
-├── skills/                             # 16 sub-skills
+├── skills/                             # 19 sub-skills
 │   ├── clay-list-clean/SKILL.md        # Hygiene
 │   ├── clay-data-hygiene/SKILL.md
-│   ├── clay-abm-list/SKILL.md          # Build
+│   ├── clay-tam-source/SKILL.md        # Source & build (v3.0)
+│   ├── clay-workflow-build/SKILL.md    # (v3.0)
+│   ├── clay-abm-list/SKILL.md
 │   ├── clay-account-research/SKILL.md
 │   ├── clay-prospect-research/SKILL.md
 │   ├── clay-enrich-waterfall/SKILL.md
@@ -260,9 +289,11 @@ clay-workbench/
 │   ├── clay-credits/SKILL.md
 │   ├── clay-cost-audit/SKILL.md
 │   ├── clay-troubleshoot/SKILL.md
+│   ├── clay-table-debug/SKILL.md       # (v3.0)
 │   └── clay-template-library/SKILL.md  # Persistence
 ├── resources/
 │   ├── global-rules.md
+│   ├── execution-surface.md            # 3-tier execution policy (v3.0)
 │   ├── intake-questions.md
 │   ├── mcp-tool-map.md
 │   ├── action-registry.md
@@ -339,8 +370,19 @@ Post-v2.0.0 polish + roadmap (shipped 2026-06-10):
 - [x] **Community templates via PR** — `CONTRIBUTING.md` + `.github/PULL_REQUEST_TEMPLATE.md` + `scripts/validate-template.py` (stdlib only; schema + anonymization checks)
 - [x] **Cross-workbook composition visualizer** — `scripts/compose-graph.py` reads `templates/library/*/template.json` and emits Mermaid graphs at `docs/composition/library-graph.md` + `docs/composition/per-template/<slug>.md`; idempotent with `--check` flag for CI drift detection
 
+v3.0.0 (2026-07-09) — built on Clay's Agent Plugin open beta:
+- [x] **Write access unblocked** — the item below sat blocked for a month; Clay's [Agent Plugin](https://github.com/clay-run/agent-plugins) open beta shipped workflow write access (`edit_node`, `validate_workflow`, `execute_clay_action`), so v3.0 rebuilds the whole execution layer around it
+- [x] **3-tier execution policy** — `resources/execution-surface.md`: official plugin CLI/MCP first, claude.ai connector second, UI walkthrough last; all 16 legacy sub-skills' execution sections migrated
+- [x] **`/clay-workflow-build`** — programmatic Clay Workflows with the Global Rules enforced at the node level (gate node before paid nodes, Sending Gate before push, snapshot-before-edit, validate-before-run, 5/25 test discipline)
+- [x] **`/clay-tam-source`** — TAM sourcing from Clay's native companies + people dataset via `clay search filters-mode`
+- [x] **`/clay-table-debug`** — record-level debugging front door to the official table-analyze / trace / value-trace / error-sweep / capacity skills
+- [x] **Programmatic webhooks** — `/clay-inbound-routing` now creates and tests webhooks via `clay webhooks` instead of handing you to the UI
+- [x] **Portfolio audit over real inventory** — `/clay-cost-audit` enumerates workbooks/tables/workflows via CLI and adds workflow-level checks (paid node without upstream gate; LLM node doing deterministic work)
+
 Next:
-- [ ] **Schema operations** — create new tables via MCP when Clay exposes the API. *Blocked on Clay exposing a write API for tables; out of our hands until then.*
+- [ ] **Table creation** — still UI-only even in the Agent Plugin; workflows cover many former table use cases in the meantime
+- [ ] **Trigger configuration** — workflow triggers (audience / webhook / table) remain UI-only; revisit when the beta exposes them
+- [ ] **Public API recipes** — standing up Clay-backed services (scoring endpoints, routing microservices) on the Public API surface
 
 ---
 

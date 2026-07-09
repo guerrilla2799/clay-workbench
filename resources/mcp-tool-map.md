@@ -1,6 +1,6 @@
-# Clay MCP — Tool Map
+# Clay MCP (claude.ai connector) — Tool Map — TIER 2
 
-Authoritative map of every `mcp__claude_ai_Clay__*` tool and when to call it. This is your primary execution path. Fall back to manual walkthrough only when the operation isn't supported.
+> **v3.0:** This connector is now the **Tier 2 fallback**, not the primary path. The primary execution surface is the official Clay Agent Plugin (`clay` CLI + `clay mcp` tools) — see `resources/execution-surface.md` for the 3-tier policy and when each tier applies. This file remains the authoritative map of the `mcp__claude_ai_Clay__*` connector tools, which still uniquely cover the ad-hoc `find-and-enrich-*` primitives and are the only path inside claude.ai (web).
 
 ---
 
@@ -136,13 +136,20 @@ User wants to...
 
 ---
 
-## Known Gaps (MCP Cannot Do)
+## Known Gaps (Connector Cannot Do) — check Tier 1 before falling to UI
 
-Use manual walkthrough or claycast-style scripting when:
+Several former gaps are now covered by **Tier 1** (official Agent Plugin) — route there first:
 
-- **Create a new Clay table from scratch** — MCP can only operate on existing tables / subroutines. Workaround: build subroutine in Clay UI first, then expose via MCP.
-- **Modify an existing column's formula / source** — schema edits aren't supported via MCP.
-- **Wire a new HTTP API enrichment** — must be configured in Clay UI.
+- **Build an automation from scratch** → Tier 1: `clay workflows create` + `edit_node` (see `/clay-workflow-build`)
+- **Wire a webhook source** → Tier 1: `clay webhooks create`
+- **Structured table queries / pagination / CSV export** → Tier 1: `clay tables query`, `table` MCP tool
+- **Version history / undo** → Tier 1: `clay workflows snapshots`
+
+Still genuinely UI-only (Tier 3 — manual walkthrough):
+
+- **Create a new Clay table from scratch** — prefer building a *workflow* instead where the use case allows.
+- **Modify an existing table column's formula / source** — schema edits aren't exposed.
+- **Configure workflow triggers** (audience segments, webhooks-as-trigger, table triggers) — design around them, tell the user what to click.
 - **Reorder columns** — UI-only.
 - **Set up the Sending Gate filter on an export action** — must configure in Clay UI on the destination action.
 

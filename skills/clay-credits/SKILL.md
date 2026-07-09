@@ -128,21 +128,21 @@ For **ROI**:
 
 ## Step 5 — Execution
 
-### MCP Path
+### Preferred Path: Tier 1 (official Agent Plugin) — see resources/execution-surface.md
 
 ```
-1. mcp__claude_ai_Clay__get-credits-available → current balance
-2. mcp__claude_ai_Clay__list_subroutines → enumerate workbooks
-3. For each workbook in scope:
-   - mcp__claude_ai_Clay__get-task on recent runs → credits actually spent
-   - mcp__claude_ai_Clay__query-objects → qualified-row count + downstream conversion data
+1. clay credits → current balance (Tier 2 fallback: mcp__claude_ai_Clay__get-credits-available)
+2. clay workbooks list + clay tables list + clay workflows list → inventory the ROI ranking runs over
+3. For each workbook / workflow in scope:
+   - clay workflows runs → credits actually spent (Tier 2 fallback: mcp__claude_ai_Clay__get-task on recent runs)
+   - clay tables query → row counts, qualified-row count + downstream conversion data
 4. Cross-reference with resources/credit-cost-table.md for per-column estimates
 5. Compute forecast / comparison / ROI tables per output format above
 ```
 
-### Manual Walkthrough
+### Manual Walkthrough (Tier 3)
 
-If MCP credit usage history is unavailable per-column:
+If Tier 1 / Tier 2 credit usage history is unavailable per-column:
 
 ```
 1. Open Clay analytics dashboard

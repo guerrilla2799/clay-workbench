@@ -97,27 +97,27 @@ IF(
 
 ## Step 5 — Execution (Specialized)
 
-### Preferred Path: MCP
+### Preferred Path: Tier 1 (official Agent Plugin) — see resources/execution-surface.md
 
 ```
-1. mcp__claude_ai_Clay__get-credits-available
-2. mcp__claude_ai_Clay__list_subroutines
-   → If an "ABM List Build" subroutine exists, prefer that
-3. If subroutine exists:
-   mcp__claude_ai_Clay__get_subroutine_input_options
-   → Map intake answers to required inputs
-   → mcp__claude_ai_Clay__run_subroutine
-4. If no subroutine:
+1. clay credits — balance pre-flight
+2. clay routines list
+   → If an "ABM List Build" routine exists, prefer that
+3. If routine exists:
+   clay routines get → map intake answers to required inputs
+   → clay routines runs to launch + poll status
+4. If no routine:
    For sample of 5 rows:
-     mcp__claude_ai_Clay__find-and-enrich-company (per domain)
+     mcp__claude_ai_Clay__find-and-enrich-company (Tier 2 — connector; per domain)
    → Show enrichment results
+   → Verify table state via clay tables rows/query or the `table` MCP tool
    → Confirm gate logic against sample
    → Proceed to full run on confirmation
 ```
 
-### Manual Fallback
+### Manual Fallback (Tier 3)
 
-If MCP can't compose the table from scratch (current limitation):
+Table creation and column-formula edits are still UI-only (see resources/execution-surface.md):
 
 1. **Create table in Clay UI**: New Table → name `"ABM Build — {ICP descriptor} — {date}"`.
 2. **Add source**: Source → CSV / HubSpot view / Sales Nav URL (per intake).
@@ -195,6 +195,8 @@ This pattern is the #1 credit saver — typically cuts burn by 40–60% on broad
 
 ## Related
 
+- For sourcing TAM upstream (no table needed) → `/clay-tam-source` via `clay search filters-mode`.
+- For a workflow-based automation alternative to a static workbook → `/clay-workflow-build`.
 - After this workbook is built and qualified accounts are identified → invoke `/clay-enrich-waterfall` to find contacts at qualified accounts.
 - For scoring qualified accounts → invoke `/clay-icp-score`.
 - For burn audits on running workbooks → invoke `/clay-troubleshoot`.

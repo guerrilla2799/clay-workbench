@@ -117,6 +117,7 @@ SLA: 5-min response target. Reply :handshake: when claimed.
 
 ```
 Phase 1 — Static test (auto_run = FALSE):
+  0. clay webhooks test <id> — signed test event, confirms the pipe before payload testing
   1. Submit 10 test webhook payloads spanning:
      - Personal email + business email
      - In-ICP + out-of-ICP
@@ -138,24 +139,40 @@ Phase 3 — Full production:
   2. Set up weekly review of low-confidence routes (e.g., is_personal_email = TRUE but high-fit company in HubSpot — should they have been routed differently?)
 ```
 
-### MCP Path (Live Operations)
+### Preferred Path: Tier 1 (official Agent Plugin) — see resources/execution-surface.md
+
+Webhook wiring — programmatic as of v3.0, no longer UI-only:
 
 ```
-# Periodic health check (run as cron-style monitoring)
-mcp__claude_ai_Clay__query-objects (last 24h of rows)
+1. clay credits — balance pre-flight
+2. clay webhooks create → returns the webhook URL + signing secret.
+   The signing secret is returned ONCE — tell the user to store it immediately
+   (secrets manager), it cannot be retrieved later.
+3. Wire the URL into the form / Marketo / HubSpot.
+4. clay webhooks test <id> → fires a signed test event; confirm the row lands.
+5. clay webhooks list / clay webhooks delete for ongoing management.
+```
+
+Table columns, run conditions, and actions are still UI-built (Tier 3) — walk the user through Manual Fallback steps 3–5 below.
+
+Live operations (periodic health check, cron-style):
+
+```
+clay tables rows / clay tables query (last 24h of rows) — or the table MCP tool
 → Distribution check: % Hot / Warm / Cold / Suppressed / Self-Serve
 → Anomaly check: spike in Suppressed could indicate customer-table dirty data
 → Anomaly check: spike in SELF_SERVE could indicate ICP shift or form-spam
 
-mcp__claude_ai_Clay__ask-question-about-accounts:
+Tier 2 (connector) fallback: query-objects for the row pull, plus
+ask-question-about-accounts:
   "What's the Hot route rate by source in the last 7 days?"
   "Which industries are sourcing the most Hot leads this week?"
 ```
 
-### Manual Fallback — Build in Clay UI
+### Manual Fallback (Tier 3) — Build in Clay UI
 
 1. Create table → name "Inbound Router — {form_name}".
-2. Set source → Webhook → copy webhook URL → wire into the form / Marketo / HubSpot.
+2. Set source → Webhook → copy webhook URL → wire into the form / Marketo / HubSpot. (If the `clay` CLI is available, prefer `clay webhooks create` — Tier 1.)
 3. Add columns 2–19 from spec.
 4. Configure all paid columns (9, 11, 12) with run conditions per spec.
 5. Add Actions:
@@ -223,3 +240,4 @@ Weekly review: % SLA met by rep, by source, by tier. Coach on misses.
 - Score logic shared with `/clay-icp-score` — use same rubric for inbound and outbound consistency.
 - Hot route into `/clay-outbound` (SDR sequence templates).
 - Form spam diagnosis → `/clay-troubleshoot`.
+- A full inbound automation can alternatively be built as a Clay Workflow (webhook trigger → enrich → route) → `/clay-workflow-build`.

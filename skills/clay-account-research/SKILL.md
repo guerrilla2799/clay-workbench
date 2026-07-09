@@ -121,26 +121,27 @@ CONCAT(
 
 ## Step 5 — Execution (Specialized)
 
-### Preferred Path: MCP
+### Preferred Path: Tier 1 (official Agent Plugin) — see resources/execution-surface.md
 
 ```
-1. mcp__claude_ai_Clay__get-credits-available
-2. mcp__claude_ai_Clay__list_subroutines
-   → If "Account Research Brief" subroutine exists, prefer it
-3. If subroutine exists:
-   mcp__claude_ai_Clay__get_subroutine_input_options
-   → Map account list + brief depth + use case
-   → mcp__claude_ai_Clay__run_subroutine on 5-row sample
-4. If no subroutine, ad-hoc:
+1. clay credits — balance pre-flight
+2. clay routines list
+   → If an "Account Research Brief" routine exists, prefer it
+3. If routine exists:
+   clay routines get → map account list + brief depth + use case
+   → clay routines runs on 5-row sample
+4. If no routine, ad-hoc:
    For 5 rows:
-     mcp__claude_ai_Clay__find-and-enrich-company (firmographics)
-   → Confirm pass_1_qualified resolves
+     mcp__claude_ai_Clay__find-and-enrich-company (Tier 2 — connector; firmographics)
+   → Confirm pass_1_qualified resolves via clay tables rows/query or the `table` MCP tool
    → Confirm Claygent prompt quality with /clay-claygent-iterator if any column underperforms
    → Expand to 25 rows
    → Full run on confirmation
 ```
 
-### Manual Fallback
+### Manual Fallback (Tier 3)
+
+Table creation and column-formula edits are still UI-only (see resources/execution-surface.md):
 
 1. New Table → `"Account Research — {list descriptor} — {date}"`
 2. Source → CSV / HubSpot view / output of `/clay-abm-list`

@@ -5,7 +5,7 @@ description: Portfolio-level audit across ALL running Clay workbooks for Global 
 
 # clay-cost-audit — Portfolio-Wide Cost & Rules Audit
 
-The portfolio-level audit skill. Use when the user wants a **proactive sweep across every Clay workbook** — find Global Rules violations, hidden burn, ROI laggards, and stale auto-runs across the whole account.
+The portfolio-level audit skill. Use when the user wants a **proactive sweep across every Clay workbook** — find Global Rules violations, hidden burn, ROI laggards, and stale auto-runs across the whole account. As of v3.0 the scope includes **workflows**, not just workbooks — the estate enumerates via `clay workbooks list`, `clay tables list/get/columns`, and `clay workflows list/get`, with `clay workflows diagram <id>` rendering a Mermaid diagram per workflow for node-level inspection.
 
 Inherits `clay-workbench/SKILL.md` master workflow. Specializes around enumeration → scoring → ranking, not single-workbook composition.
 
@@ -45,6 +45,15 @@ Run all 12 against every workbook in scope. Each returns: PASS / WARN / FAIL wit
 | 10 | Provider mix correctness | Provider used doesn't match ICP geo / size (e.g., Apollo-only on EU enterprise) | MEDIUM |
 | 11 | Dedup hygiene | Signal monitor without dedup_key history table → re-firing alerts | HIGH |
 | 12 | ROI ranking | Workbook with $/qualified > 5× portfolio median AND no strategic carve-out | MEDIUM |
+
+### Workflow-level checks (v3.0)
+
+Workflows are auditable too. Enumerate via `clay workflows list`, inspect with `clay workflows get` + `clay workflows diagram <id>`. Flag:
+
+- **W1 — Paid tool node with no upstream gate node** (the workflow equivalent of check 1). Severity: HIGH.
+- **W2 — Claygent (LLM) node doing deterministic work** a formula or tool node could do — parsing, formatting, lookups. Severity: MEDIUM.
+
+Fix path for both: the official plugin's `workflow-optimize-credits` and `workflow-simplify` skills.
 
 ### Per-Workbook Violation Output
 
@@ -110,23 +119,25 @@ Run all 12 against every workbook in scope. Each returns: PASS / WARN / FAIL wit
 
 ## Step 5 — Execution
 
-### MCP Path
+### Preferred Path: Tier 1 (official Agent Plugin) — see resources/execution-surface.md
 
 ```
-1. mcp__claude_ai_Clay__get-credits-available → current balance
-2. mcp__claude_ai_Clay__list_subroutines → enumerate every running workbook + subroutine in scope
+1. clay credits → current balance (Tier 2 fallback: mcp__claude_ai_Clay__get-credits-available)
+2. clay workbooks list + clay tables list + clay workflows list → enumerate the estate in scope
 3. For each workbook:
-   - mcp__claude_ai_Clay__get-task on recent runs → credits spent
-   - mcp__claude_ai_Clay__query-objects on the workbook's qualified-row column → conversion counts
-   - Inspect column-by-column spec (where MCP allows)
-4. Run 12-check audit per workbook
-5. Aggregate into portfolio roll-up
-6. Cross-reference cost data with resources/credit-cost-table.md
+   - clay workbooks get + clay tables get/columns → column-by-column spec
+   - clay tables query on the qualified-row column → conversion counts
+   - clay workflows runs → credits spent (Tier 2 fallback: mcp__claude_ai_Clay__get-task on recent runs)
+4. For each workflow:
+   - clay workflows get + clay workflows diagram <id> → Mermaid render for node-level inspection
+5. Run 12-check audit per workbook + workflow-level checks (W1/W2) per workflow
+6. Aggregate into portfolio roll-up
+7. Cross-reference cost data with resources/credit-cost-table.md
 ```
 
-### Manual Walkthrough
+### Manual Walkthrough (Tier 3)
 
-If MCP introspection is limited:
+If Tier 1 / Tier 2 introspection is limited:
 
 ```
 1. Open Clay dashboard → analytics view → trailing 30d

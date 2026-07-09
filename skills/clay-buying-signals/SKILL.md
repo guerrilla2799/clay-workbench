@@ -150,21 +150,21 @@ Backfill protocol (CRITICAL — single-signal noise is the #1 failure):
 Without backfill validation, this skill produces a vanity score, not a useful one.
 ```
 
-### MCP Path
+### Preferred Path: Tier 1 (official Agent Plugin) — see resources/execution-surface.md
 
 ```
-1. mcp__claude_ai_Clay__get-credits-available
-2. mcp__claude_ai_Clay__list_subroutines → check for "Buying Signal Composite" subroutine
-3. mcp__claude_ai_Clay__find-and-enrich-company for sample
-4. Build columns 1–23 per spec
+1. clay credits — balance pre-flight (this skill is expensive; see Credit Pre-Flight below)
+2. clay routines list → check for a "Buying Signal Composite" routine; clay routines runs for status
+3. mcp__claude_ai_Clay__find-and-enrich-company for sample (Tier 2 — connector)
+4. Build columns 1–23 per spec — table columns are still UI-built (Tier 3); walk the user through
 5. Run 100-account historical backfill (closed-won + closed-lost mix)
-6. Compute discrimination metrics
+6. clay tables rows / clay tables query (or the table MCP tool) → read back scores, compute discrimination metrics
 7. Tune weights
 8. Once discrimination ≥ thresholds → flip auto_run = TRUE on daily refresh
 9. Pipe HOT-tier alerts to Slack via /clay-signal-monitor's alert pattern
 ```
 
-### Manual Fallback
+### Manual Fallback (Tier 3)
 
 1. New table → `"Buying Signals Composite — {account_universe}"`
 2. Source → ABM Tier 1+2 account list (from `/clay-abm-list`)

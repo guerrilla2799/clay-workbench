@@ -143,21 +143,21 @@ The FALLBACK is the single most important block. Without it, Claygent fabricates
 
 ## Step 5 — Execution
 
-### MCP Path
+### Preferred Path: Tier 1 (official Agent Plugin) — see resources/execution-surface.md
 
 ```
-1. mcp__claude_ai_Clay__get-credits-available
-2. mcp__claude_ai_Clay__query-objects on the target Claygent column for sample rows
+1. clay credits → balance (Tier 2 fallback: mcp__claude_ai_Clay__get-credits-available)
+2. clay tables query on the target Claygent column for sample rows (or clay tables rows)
 3. For each iteration:
-   - Update the column's prompt in Clay UI (no MCP for prompt edits currently)
-   - mcp__claude_ai_Clay__run_subroutine on the 5-row sample table
-   - Pull outputs via query-objects
+   - Table-column prompts: edit in Clay UI (still UI-only). Workflow-node prompts: edit_node → validate_workflow.
+   - Run the 5-row sample (clay routines runs; Tier 2 fallback: mcp__claude_ai_Clay__run_subroutine)
+   - Pull outputs via clay tables query
    - Score by hand → iterate prompt
 4. When 5/5 PASS → expand to 25
-5. mcp__claude_ai_Clay__get-task for cost per row
+5. clay workflows runs / clay routines runs for cost per row (Tier 2 fallback: mcp__claude_ai_Clay__get-task)
 ```
 
-### Manual Walkthrough
+### Manual Walkthrough (Tier 3)
 
 1. Pick 5 rows that span the input diversity (don't all be Tier 1 US tech — include EU SMB and edge cases)
 2. Open the Claygent column → edit prompt
